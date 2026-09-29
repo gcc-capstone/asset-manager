@@ -1,0 +1,106 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+
+:root {
+  /* Enables light/dark mode switching */
+  color-scheme: light dark
+}
+
+/* Defines tailwind CSS themes */
+@theme {
+  /* Logo Colors */
+
+  /* Primary blue brand color */
+  --color-brand-blue: light-dark(#005fa9, #76c3ff);
+
+  /* Primary green brand color */
+  --color-brand-green: light-dark(#70be44, #70be44);
+
+  /* Light green brand color */
+  --color-brand-light-green: light-dark(#e1edde, #1b281c);
+
+  /* Light blue brand color */
+  --color-brand-light-blue: light-dark(#dee6ed, #1f2a34);
+
+  /* The primary background color */
+  --color-main-background: light-dark(#e1edde, #0c0c0c);
+
+  /* The secondary background color (used for text fields, buttons, etc) */
+  --color-main-background-2: light-dark(#e1edde, #121212);
+
+  /* UI System Colors */
+  --color-ui-dark: #0f172a;
+  --color-ui-light: #f8fafc;
+  --color-ui-accent: #f59e0b;
+}
+
+/* Body styles */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-brand-light-green);
+  font-family: "Georgia", serif;
+  font-weight: 400;
+}
+
+/* Header styles */
+h1,h2,h3,.logo-text {
+  font-family: "Georgia", serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Main content area style */
+.main-container {
+  /* Takes up 80% of the screen on small/medium displays */
+  width: 80%;
+
+  /* Stops growing past 1440p monitor */
+  max-width: 1400px;
+
+  /* Centers the container horizontally and adds top/bottom spacing */
+  margin: 2rem auto;
+
+  background-color: var(--color-main-background);
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@layer utilities {
+
+  /* style for clickable/link text */
+  .app-hover-text {
+    -webkit-user-select: none;
+    user-select: none;
+    @apply hover:text-brand-green transition-colors
+  };
+
+  /* style for tab buttons */
+  .app-tab-button {
+    @apply pl-5 text-2xl text-brand-blue hover:text-brand-green transition-colors
+  };
+
+  /* style for title text */
+  .app-title {
+    font-weight: 700;
+    /*letter-spacing: -0.02em;*/
+    @apply text-4xl text-brand-blue pb-5
+  };
+
+  /* style for subtitle text */
+  .app-subtitle {
+    font-weight: 300;
+    @apply text-2xl text-brand-blue
+  };
+
+  /* style for generic label text */
+  .app-label-text {
+    @apply text-lg text-brand-blue
+  }
+}
