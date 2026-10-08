@@ -1,4 +1,12 @@
 
+/** A scheduled outage at a plant. Dates are "YYYY-MM-DD". */
+export type Outage = {
+    plant: string,
+    start: string,
+    end: string,
+    type: string,
+    description: string,
+}
 
 export const db = {
 
