@@ -3,7 +3,9 @@ import darkLogo from "../assets/logo-dark.png"
 import { TextField } from "./TextField"
 import { MagnifyingGlass, User } from "./Icons"
 
-/** Props for the main area: which header tab is selected, and what to do when one is clicked */
+/** ----------------------------------------------------------------------------------------------------------------
+ * Defines the main content area for any page on the app, with header included. Shows which is selected
+ */
 type MainAreaProps = React.PropsWithChildren<{
     activeTab?: string,
     onTabSelect?: (tab: string) => void
@@ -48,4 +50,5 @@ export function MainArea({ children, activeTab, onTabSelect }: MainAreaProps): R
             {children}
         </main>
     </>
+    
 }
