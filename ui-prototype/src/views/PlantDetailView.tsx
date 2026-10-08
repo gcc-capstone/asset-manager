@@ -110,6 +110,13 @@ function PlantInfo({ plant }: { plant: Plant }): React.JSX.Element {
         ["Next outage", outages.length ? `${formatDate(outages[0].start)} (${outages[0].type})` : "None scheduled"],
     ];
 
+    // Michael - Contact info 
+    const contactRows: [string, string][] = [
+        ["Owner", "owner@plantoperations.com"],
+        ["Service Tech 1", "service-tech-1@plantoperations.com"],
+        ["Service Tech 2", "service-tech-2@plantoperations.com"],
+    ];
+
     return <div className="flex flex-col gap-4">
         <App.Subtitle text="Plant Info" />
         <dl className="grid grid-cols-[auto_1fr] gap-x-10 gap-y-3">
@@ -117,6 +124,23 @@ function PlantInfo({ plant }: { plant: Plant }): React.JSX.Element {
                 <Fragment key={label}>
                     <dt className="app-label-text font-bold">{label}</dt>
                     <dd className="app-label-text">{value}</dd>
+                </Fragment>
+            )}
+        </dl>
+        
+        {/* Michael contact info */}
+        <div className="border-b-2 border-brand-blue" />
+
+        <App.Subtitle text="Contact Info" />
+        <dl className="grid grid-cols-[auto_1fr] gap-x-10 gap-y-3">
+            {contactRows.map(([label, value]) =>
+                <Fragment key={label}>
+                    <dt className="app-label-text font-bold">{label}</dt>
+                    <dd className="app-label-text">
+                        <a href={`mailto:${value}`} className="underline text-brand-blue hover:text-brand-green">
+                            {value}
+                        </a>
+                    </dd>
                 </Fragment>
             )}
         </dl>
