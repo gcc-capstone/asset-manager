@@ -102,5 +102,10 @@ h1,h2,h3,.logo-text {
   /* style for generic label text */
   .app-label-text {
     @apply text-lg text-brand-blue
-  }
+  };
+
+    /* style for header nav links */
+  .app-header-link {
+    @apply font-bold text-xl text-brand-blue hover:text-brand-green transition-colors border-b-4 border-transparent
+  };
 }
