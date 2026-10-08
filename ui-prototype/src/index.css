@@ -67,6 +67,52 @@ h1,h2,h3,.logo-text {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
+@media (max-width: 767px) {
+  .app-shell-header {
+    height: auto;
+    min-height: 4rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .app-shell-header > div:first-child {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .app-shell-navigation {
+    width: 100%;
+    gap: 1.25rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+
+  .app-shell-search {
+    display: none;
+  }
+
+  .app-shell-header > div:last-child {
+    position: absolute;
+    top: 0.85rem;
+    right: 1rem;
+  }
+
+  .app-shell-header > div:last-child span {
+    font-size: 0.9rem;
+  }
+
+  .main-container {
+    width: 100%;
+    margin: 0;
+    padding: 1rem;
+    border-radius: 0;
+    flex-direction: column;
+    gap: 1rem;
+  }
+}
+
 .no-select {
   -webkit-user-select: none;
   user-select: none;
