@@ -32,31 +32,36 @@ function PlantDetailView({ plant, onBack }: { plant: Plant, onBack: () => void }
         ["Assets", App.Icon.PowerPlants],
     ];
 
-    return <>
-        {/* Left side: sections for this plant (same styling as the main sidebar) */}
-        <nav className="flex flex-col gap-4 pr-10">
-            {sections.map(([name, Icon]) =>
-                <div key={name} className={`${section === name ? "border-b-4 border-brand-green" : ""} flex`}>
-                    <Icon />
-                    <button className="app-tab-button" onClick={() => setSection(name)}>
-                        {name}
-                    </button>
-                </div>
-            )}
-        </nav>
+        return <div className="flex flex-col w-full">
 
-        {/* Right side: the selected section */}
-        <div className="flex flex-col grow px-6 py-4">
-            <span className="app-label-text app-hover-text cursor-pointer pb-2" onClick={onBack}>
-                ← All plants
-            </span>
-            <App.Title text={plant.name} />
+        {/* Top: back link and plant name, above the sidebar */}
+        <span className="app-label-text app-hover-text cursor-pointer pb-2" onClick={onBack}>
+            ← All plants
+        </span>
+        <App.Title text={plant.name} />
+        <div className="border-b-2 border-brand-blue mb-6" />
 
-            {section === "Outages" && <PlantOutages plant={plant} />}
-            {section === "Info" && <PlantInfo plant={plant} />}
-            {section === "Assets" && <PlantAssets plant={plant} />}
+        <div className="flex">
+            {/* Left side: sections for this plant (same styling as the main sidebar) */}
+            <nav className="flex flex-col gap-4 pr-10">
+                {sections.map(([name, Icon]) =>
+                    <div key={name} className={`${section === name ? "border-b-4 border-brand-green" : ""} flex`}>
+                        <Icon />
+                        <button className="app-tab-button" onClick={() => setSection(name)}>
+                            {name}
+                        </button>
+                    </div>
+                )}
+            </nav>
+
+            {/* Right side: the selected section */}
+            <div className="flex flex-col grow px-6">
+                {section === "Outages" && <PlantOutages plant={plant} />}
+                {section === "Info" && <PlantInfo plant={plant} />}
+                {section === "Assets" && <PlantAssets plant={plant} />}
+            </div>
         </div>
-    </>
+    </div>
 }
 
 /** ----------------------------------------------------------------------------------------------------------------
