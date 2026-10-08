@@ -2,6 +2,7 @@ import CalendarView from './views/CalendarView'
 import PlantsView from './views/PlantsView'
 import PlantDetailView from './views/PlantDetailView'
 import SettingsView from './views/SettingsView'
+import CompaniesView from './views/CompaniesView'
 import { App } from './components/Components'
 import { type Plant } from './data/Data'
 import { useState } from 'react'
@@ -44,17 +45,15 @@ function Home(): React.JSX.Element {
               [PlantsView, App.Icon.PowerPlants, () => <>Plants</>],
               [CalendarView, App.Icon.Calendar, () => <>Calendar</>],
               [SettingsView, App.Icon.Settings, () => <>Settings</>],
-              [() => <></>, App.Icon.Company, () => <>Companies</>],
+              [CompaniesView, App.Icon.Company, () => <>Companies</>],
             ] as [() => React.JSX.Element, () => React.JSX.Element, () => React.JSX.Element][])
               .map(([element, icon, title]) =>
-                <>
-                  <div className={`${OpenView === element ? "border-b-4 border-brand-green" : ""} flex`}>
-                    {icon()}
-                    <button className="app-tab-button" onClick={() => setOpenView(() => element)}>
-                      {title()}
-                    </button>
-                  </div>
-                </>
+                <div key={element.name} className={`${OpenView === element ? "border-b-4 border-brand-green" : ""} flex`}>
+                  {icon()}
+                  <button className="app-tab-button" onClick={() => setOpenView(() => element)}>
+                    {title()}
+                  </button>
+                </div>
               )
           }
         </nav>
