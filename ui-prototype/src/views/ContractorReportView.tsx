@@ -23,11 +23,15 @@ type ReportFields = {
     endTime: string,
     breakHours: string,
     workType: string,
-    assetApplication: string,
+}
+
+type Equipment = {
+    id: string,
+    application: string,
     assetTag: string,
-    assetSerial: string,
-    assetBrand: string,
-    assetModel: string,
+    serial: string,
+    brand: string,
+    model: string,
     workPerformed: string,
 }
 
@@ -71,12 +75,6 @@ const initialFields: ReportFields = {
     endTime: '16:30',
     breakHours: '0.5',
     workType: 'Repair',
-    assetApplication: 'Feedwater system',
-    assetTag: 'RIV-PMP-102',
-    assetSerial: 'SN-24861',
-    assetBrand: 'Northstar',
-    assetModel: 'FW-400',
-    workPerformed: '',
 }
 
 const fieldClassName = 'w-full rounded-lg border border-brand-blue bg-main-background px-3 py-3 text-base text-brand-blue placeholder:text-brand-blue/50 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-green'
@@ -108,6 +106,17 @@ function FormField({
 
 function ContractorReportView(): React.JSX.Element {
     const [fields, setFields] = useState(initialFields)
+    const [equipment, setEquipment] = useState<Equipment[]>([
+        {
+            id: 'equipment-1',
+            application: 'Feedwater system',
+            assetTag: 'RIV-PMP-102',
+            serial: 'SN-24861',
+            brand: 'Northstar',
+            model: 'FW-400',
+            workPerformed: '',
+        },
+    ])
     const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([
         { id: 'daily-log-1', date: today, assetTag: 'RIV-PMP-102', notes: '' },
     ])
@@ -127,7 +136,7 @@ function ContractorReportView(): React.JSX.Element {
     const totalHours = Math.max(0, shiftMinutes / 60 - (Number(fields.breakHours) || 0)).toFixed(1)
 
     function addDailyLog() {
-        setDailyLogs((current) => [...current, { id: crypto.randomUUID(), date: fields.workDate, assetTag: fields.assetTag, notes: '' }])
+        setDailyLogs((current) => [...current, { id: crypto.randomUUID(), date: fields.workDate, assetTag: equipment[0]?.assetTag ?? '', notes: '' }])
     }
 
     function updateDailyLog(id: string, key: keyof Omit<DailyLog, 'id'>, value: string) {
@@ -140,6 +149,22 @@ function ContractorReportView(): React.JSX.Element {
 
     function updateUsedPart(id: string, key: keyof Omit<UsedPart, 'id'>, value: string) {
         setUsedParts((current) => current.map((part) => part.id === id ? { ...part, [key]: value } : part))
+    }
+
+    function updateEquipment(id: string, key: keyof Omit<Equipment, 'id'>, value: string) {
+        setEquipment((current) => current.map((item) => item.id === id ? { ...item, [key]: value } : item))
+    }
+
+    function addEquipment() {
+        setEquipment((current) => [...current, {
+            id: crypto.randomUUID(),
+            application: '',
+            assetTag: '',
+            serial: '',
+            brand: '',
+            model: '',
+            workPerformed: '',
+        }])
     }
 
     return <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
@@ -236,24 +261,53 @@ function ContractorReportView(): React.JSX.Element {
             </section>
 
             <section className="rounded-xl border border-brand-blue bg-main-background-2 p-4 sm:p-5">
-                <h2 className="mb-1 text-xl font-bold text-brand-blue">Equipment serviced</h2>
-                <p className="mb-4 text-sm text-brand-blue opacity-70">Asset and equipment identifiers from the service report</p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <FormField label="Application / part" value={fields.assetApplication} onChange={(value) => updateField('assetApplication', value)} />
-                    <FormField label="Plant asset tag" value={fields.assetTag} onChange={(value) => updateField('assetTag', value)} />
-                    <FormField label="Serial #" value={fields.assetSerial} onChange={(value) => updateField('assetSerial', value)} />
-                    <FormField label="Brand" value={fields.assetBrand} onChange={(value) => updateField('assetBrand', value)} />
-                    <FormField label="Model" value={fields.assetModel} onChange={(value) => updateField('assetModel', value)} />
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 className="text-xl font-bold text-brand-blue">Equipment serviced</h2>
+                        <p className="text-sm text-brand-blue opacity-70">Add an entry for each asset worked on.</p>
+                    </div>
+                    <button
+                        className="rounded-lg border border-brand-blue px-3 py-2 text-sm font-bold text-brand-blue hover:bg-brand-light-blue"
+                        type="button"
+                        onClick={addEquipment}>
+                        + Add equipment
+                    </button>
                 </div>
-                <label className="mt-4 flex flex-col gap-1.5 text-sm font-bold text-brand-blue">
-                    Scope of work performed
-                    <textarea
-                        className={`${fieldClassName} min-h-28 resize-y`}
-                        value={fields.workPerformed}
-                        onChange={(event) => updateField('workPerformed', event.target.value)}
-                        placeholder="Describe the repair, replacement, installation, inspection, and result..."
-                    />
-                </label>
+                {equipment.length === 0
+                    ? <p className="rounded-lg border border-dashed border-brand-blue p-4 text-sm text-brand-blue opacity-70">
+                        No equipment added yet.
+                    </p>
+                    : <div className="flex flex-col gap-4">
+                        {equipment.map((item, index) =>
+                            <div key={item.id} className="rounded-lg border border-brand-light-blue bg-main-background p-3">
+                                <div className="mb-3 flex items-center justify-between">
+                                    <h3 className="font-bold text-brand-blue">Equipment {index + 1}</h3>
+                                    <button
+                                        className="text-sm font-bold text-red-700"
+                                        type="button"
+                                        onClick={() => setEquipment((current) => current.filter((entry) => entry.id !== item.id))}>
+                                        Remove
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <FormField label="Application / part" value={item.application} onChange={(value) => updateEquipment(item.id, 'application', value)} />
+                                    <FormField label="Plant asset tag" value={item.assetTag} onChange={(value) => updateEquipment(item.id, 'assetTag', value)} />
+                                    <FormField label="Serial #" value={item.serial} onChange={(value) => updateEquipment(item.id, 'serial', value)} />
+                                    <FormField label="Brand" value={item.brand} onChange={(value) => updateEquipment(item.id, 'brand', value)} />
+                                    <FormField label="Model" value={item.model} onChange={(value) => updateEquipment(item.id, 'model', value)} />
+                                </div>
+                                <label className="mt-4 flex flex-col gap-1.5 text-sm font-bold text-brand-blue">
+                                    Work performed on this equipment
+                                    <textarea
+                                        className={`${fieldClassName} min-h-24 resize-y`}
+                                        value={item.workPerformed}
+                                        onChange={(event) => updateEquipment(item.id, 'workPerformed', event.target.value)}
+                                        placeholder="Describe the repair, replacement, installation, inspection, and result..."
+                                    />
+                                </label>
+                            </div>
+                        )}
+                    </div>}
             </section>
 
             <section className="rounded-xl border border-brand-blue bg-main-background-2 p-4 sm:p-5">
