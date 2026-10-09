@@ -12,7 +12,7 @@ type MainAreaProps = React.PropsWithChildren<{
 }>
 
 export function MainArea({ children, activeTab, onTabSelect }: MainAreaProps): React.JSX.Element {    return <>
-        <header className="relative bg-main-background shadow-lg h-16 flex items-center justify-between px-6 border-b-2 border-brand-blue">
+        <header className="app-shell-header relative bg-main-background shadow-lg h-16 flex items-center justify-between px-6 border-b-2 border-brand-blue">
 
             <div className="flex items-center gap-10">
                 <picture>
@@ -21,7 +21,7 @@ export function MainArea({ children, activeTab, onTabSelect }: MainAreaProps): R
                 </picture>
 
                 {/* Header navigation links, to the right of the logo */}
-                <nav className="flex items-center gap-8">
+                <nav className="app-shell-navigation flex items-center gap-8">
                     {["Admin", "Parts", "Plants", "Tasks"].map((label) =>
                         <button
                             key={label}
@@ -33,11 +33,13 @@ export function MainArea({ children, activeTab, onTabSelect }: MainAreaProps): R
                 </nav>
             </div>
 
-            <TextField placeholder="Search..." width="25em">
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    <MagnifyingGlass />
-                </div>
-            </TextField>
+            <div className="app-shell-search">
+                <TextField placeholder="Search..." width="25em">
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <MagnifyingGlass />
+                    </div>
+                </TextField>
+            </div>
 
             <div className="group flex items-center gap-3 cursor-pointer z-10">
                 <span className="font-medium text-xl text-brand-blue group-hover:text-brand-green group-hover:font-bold transition-colors">
