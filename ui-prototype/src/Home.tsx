@@ -11,7 +11,7 @@ import { useState } from 'react'
 function Home(): React.JSX.Element {
 
   /* State that holds the active view */
-  const [OpenView, setOpenView] = useState(() => SettingsView);
+  const [OpenView, setOpenView] = useState(() => CalendarView);
 
   /* State that holds the selected header tab */
   const [activeTab, setActiveTab] = useState("Plants");
@@ -36,6 +36,12 @@ function Home(): React.JSX.Element {
           <PlantsView onSelect={setSelectedPlant} />
         </div>)
 
+      /* Settings: opened from the account button in the header */
+      : activeTab === "Settings"
+      ? <div className="min-w-0 flex-1 px-6 py-4">
+        <SettingsView />
+      </div>
+
       /* Other tabs: the original sidebar and views */
       : <>
         {/* Left side: Panel allowing different views to be opened. */}
@@ -45,7 +51,6 @@ function Home(): React.JSX.Element {
             ([
               [PlantsView, App.Icon.PowerPlants, () => <>Plants</>],
               [CalendarView, App.Icon.Calendar, () => <>Calendar</>],
-              [SettingsView, App.Icon.Settings, () => <>Settings</>],
               [CompaniesView, App.Icon.Company, () => <>Companies</>],
               [ContractorReportView, App.Icon.Calendar, () => <>Service Report</>],
             ] as [() => React.JSX.Element, () => React.JSX.Element, () => React.JSX.Element][])
