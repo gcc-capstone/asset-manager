@@ -2,6 +2,7 @@ import CalendarView from './views/CalendarView'
 import PlantsView from './views/PlantsView'
 import PlantDetailView from './views/PlantDetailView'
 import SettingsView from './views/SettingsView'
+import AdminView from './views/AdminView'
 import CompaniesView from './views/CompaniesView'
 import ContractorReportView from './views/ContractorReportView'
 import { App } from './components/Components'
@@ -35,6 +36,12 @@ function Home(): React.JSX.Element {
         : <div className="px-6 py-4">
           <PlantsView onSelect={setSelectedPlant} />
         </div>)
+
+      /* Admin tab: accounts and the plants each one can access */
+      : activeTab === "Admin"
+      ? <div className="min-w-0 flex-1 px-6 py-4">
+        <AdminView />
+      </div>
 
       /* Settings: opened from the account button in the header */
       : activeTab === "Settings"
