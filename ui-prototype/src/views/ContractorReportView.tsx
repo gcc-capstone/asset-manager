@@ -176,27 +176,7 @@ function ContractorReportView(): React.JSX.Element {
             </p>
         </header>
 
-        <section className="rounded-xl border border-brand-blue bg-main-background-2 p-4 sm:p-5">
-            <h2 className="text-lg font-bold text-brand-blue">Brand colors</h2>
-            <p className="mb-3 text-sm text-brand-blue opacity-70">Colors used throughout this report screen</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {[
-                    ['Brand blue', '#005FA9', '#005FA9'],
-                    ['Brand green', '#70BE44', '#70BE44'],
-                    ['Light blue', '#DEE6ED', '#DEE6ED'],
-                    ['Light green', '#E1EDDE', '#E1EDDE'],
-                ].map(([name, hex, color]) =>
-                    <div key={name} className="flex min-w-0 items-center gap-2 rounded-lg border border-brand-light-blue bg-main-background p-2">
-                        <span className="h-8 w-8 shrink-0 rounded-md border border-black/10" style={{ backgroundColor: color }} />
-                        <span className="min-w-0">
-                            <span className="block truncate text-xs font-bold text-brand-blue">{name}</span>
-                            <span className="block text-xs text-brand-blue opacity-70">{hex}</span>
-                        </span>
-                    </div>
-                )}
-            </div>
-        </section>
-
+        
         <form
             className="flex flex-col gap-5"
             onSubmit={(event) => {
@@ -305,6 +285,13 @@ function ContractorReportView(): React.JSX.Element {
                                         placeholder="Describe the repair, replacement, installation, inspection, and result..."
                                     />
                                 </label>
+                                    <div className="mt-4">
+                                    <button
+                                        className="rounded-lg border border-brand-blue px-3 py-2 text-sm font-bold text-brand-blue hover:bg-brand-light-blue"
+                                        type="button">
+                                        Upload images
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>}
