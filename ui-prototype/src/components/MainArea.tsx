@@ -11,21 +11,27 @@ type MainAreaProps = React.PropsWithChildren<{
     onTabSelect?: (tab: string) => void
 }>
 
-export function MainArea({ children, activeTab, onTabSelect }: MainAreaProps): React.JSX.Element {    return <>
+export function MainArea({ children, activeTab, onTabSelect }: MainAreaProps): React.JSX.Element {
+
+    /* The account button opens the Settings page */
+    const settingsOpen = activeTab === "Settings";
+
+    return <>
         <header className="app-shell-header relative bg-main-background shadow-lg h-16 flex items-center justify-between px-6 border-b-2 border-brand-blue">
 
-            <div className="flex items-center gap-10">
-                <picture>
+            <div className="flex items-center gap-10 self-stretch">
+                <picture className="flex items-center">
                     <source srcSet={darkLogo} media="(prefers-color-scheme: dark)" />
                     <img src={logo} alt="Company Logo" className="h-10 w-auto object-contain" />
                 </picture>
 
-                {/* Header navigation links, to the right of the logo */}
-                <nav className="app-shell-navigation flex items-center gap-8">
+                {/* Header navigation links, to the right of the logo. The current page gets a green underline. */}
+                <nav className="app-shell-navigation flex items-stretch gap-8 self-stretch">
                     {["Admin", "Parts", "Plants", "Tasks"].map((label) =>
                         <button
                             key={label}
-                            className={`app-header-link ${activeTab === label ? "border-brand-green" : ""}`}
+                            className="app-header-link"
+                            aria-current={activeTab === label ? "page" : undefined}
                             onClick={() => onTabSelect?.(label)}>
                             {label}
                         </button>
@@ -41,16 +47,19 @@ export function MainArea({ children, activeTab, onTabSelect }: MainAreaProps): R
                 </TextField>
             </div>
 
-            <div className="group flex items-center gap-3 cursor-pointer z-10">
-                <span className="font-medium text-xl text-brand-blue group-hover:text-brand-green group-hover:font-bold transition-colors">
-                    <b>My Account</b>
-                </span>
+            {/* Account button: icon only, opens Settings */}
+            <button
+                className={`app-account-button group ${settingsOpen ? "app-account-button-active" : ""}`}
+                aria-label="Account settings"
+                aria-current={settingsOpen ? "page" : undefined}
+                title="Account settings"
+                onClick={() => onTabSelect?.("Settings")}>
                 <User />
-            </div>
+            </button>
         </header >
         <main className="main-container flex">
             {children}
         </main>
     </>
-    
+
 }

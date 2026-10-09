@@ -8,10 +8,14 @@
 
 /* Defines tailwind CSS themes */
 @theme {
+  /* Fonts: bold grotesque for headings (close to the logo), clean sans for body text */
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+
   /* Logo Colors */
 
-  /* Primary blue brand color */
-  --color-brand-blue: light-dark(#005fa9, #76c3ff);
+  /* Primary blue brand color (logo blue in light mode, a brighter but still saturated blue in dark mode) */
+  --color-brand-blue: light-dark(#0054a4, #4a9eea);
 
   /* Primary green brand color */
   --color-brand-green: light-dark(#70be44, #70be44);
@@ -20,13 +24,23 @@
   --color-brand-light-green: light-dark(#e1edde, #1b281c);
 
   /* Light blue brand color */
-  --color-brand-light-blue: light-dark(#dee6ed, #1f2a34);
+  --color-brand-light-blue: light-dark(#dee6ed, #1a2633);
 
-  /* The primary background color */
-  --color-main-background: light-dark(#e1edde, #0c0c0c);
+  /* The primary background color (header) */
+  --color-main-background: light-dark(#ffffff, #0c0c0c);
 
-  /* The secondary background color (used for text fields, buttons, etc) */
-  --color-main-background-2: light-dark(#e1edde, #121212);
+  /* The page background behind the content (a lighter black than the header in dark mode) */
+  --color-page-background: light-dark(#f4f6f8, #1a1d21);
+
+  /* The secondary background color (used for text fields, buttons, cards, etc) */
+  --color-main-background-2: light-dark(#ffffff, #23272c);
+
+  /* Neutral text colors, so not everything has to be blue */
+  --color-text: light-dark(#14212e, #e6ebf0);
+  --color-text-muted: light-dark(#5b6875, #9aa6b2);
+
+  /* Subtle divider / border color */
+  --color-line: light-dark(#dde3ea, #333a42);
 
   /* UI System Colors */
   --color-ui-dark: #0f172a;
@@ -38,33 +52,27 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: var(--color-brand-light-green);
-  font-family: "Georgia", serif;
+  background-color: var(--color-page-background);
+  color: var(--color-text);
+  font-family: var(--font-sans);
   font-weight: 400;
 }
 
 /* Header styles */
 h1,h2,h3,.logo-text {
-  font-family: "Georgia", serif;
+  font-family: var(--font-display);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
 
-/* Main content area style */
+/* Main content area style: fills the whole screen under the header */
 .main-container {
-  /* Takes up 80% of the screen on small/medium displays */
-  width: 80%;
-
-  /* Stops growing past 1440p monitor */
-  max-width: 1400px;
-
-  /* Centers the container horizontally and adds top/bottom spacing */
-  margin: 2rem auto;
-
-  background-color: var(--color-main-background);
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  min-height: calc(100vh - 4rem);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 2rem 2.5rem;
+  background-color: var(--color-page-background);
 }
 
 @media (max-width: 767px) {
@@ -93,21 +101,18 @@ h1,h2,h3,.logo-text {
     display: none;
   }
 
-  .app-shell-header > div:last-child {
+  .app-account-button {
     position: absolute;
-    top: 0.85rem;
+    top: 0.6rem;
     right: 1rem;
   }
 
-  .app-shell-header > div:last-child span {
-    font-size: 0.9rem;
+  .app-header-link {
+    height: 2.75rem;
   }
 
   .main-container {
-    width: 100%;
-    margin: 0;
     padding: 1rem;
-    border-radius: 0;
     flex-direction: column;
     gap: 1rem;
   }
@@ -129,29 +134,48 @@ h1,h2,h3,.logo-text {
 
   /* style for tab buttons */
   .app-tab-button {
-    @apply pl-5 text-2xl text-brand-blue hover:text-brand-green transition-colors
+    font-family: var(--font-display);
+    font-weight: 600;
+    @apply pl-4 text-xl text-text hover:text-brand-green transition-colors
   };
 
   /* style for title text */
   .app-title {
-    font-weight: 700;
-    /*letter-spacing: -0.02em;*/
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: -0.01em;
     @apply text-4xl text-brand-blue pb-5
   };
 
   /* style for subtitle text */
   .app-subtitle {
-    font-weight: 300;
-    @apply text-2xl text-brand-blue
+    font-weight: 400;
+    @apply text-xl text-text
   };
 
   /* style for generic label text */
   .app-label-text {
-    @apply text-lg text-brand-blue
+    @apply text-base text-text-muted
   };
 
-  /* style for header nav links */
+  /* style for header nav links: full header height so the underline sits on the header's bottom edge */
   .app-header-link {
-    @apply font-bold text-xl text-brand-blue hover:text-brand-green transition-colors border-b-4 border-transparent
+    font-family: var(--font-display);
+    @apply flex items-center px-1 pt-1 font-bold text-lg text-text-muted hover:text-text transition-colors border-b-4 border-transparent cursor-pointer
+  };
+
+  /* the page you're on: blue text + green underline */
+  .app-header-link[aria-current="page"] {
+    @apply text-brand-blue border-brand-green
+  };
+
+  /* account button in the header (icon only) */
+  .app-account-button {
+    @apply z-10 flex items-center justify-center w-11 h-11 rounded-full cursor-pointer transition-colors hover:bg-main-background-2
+  };
+
+  /* account button while Settings is open: green ring, like the tab underline */
+  .app-account-button-active {
+    @apply ring-2 ring-brand-green ring-offset-2 ring-offset-main-background
   };
 }
