@@ -8,6 +8,24 @@ export type Outage = {
     description: string,
 }
 
+/* A scheduled task */
+export type Task = {
+    title: string,
+    completed: boolean | undefined,
+    plant: string,
+    assignee: string | undefined,
+    dueDate: string,
+    category: string,
+    description: string | undefined
+}
+
+export function dateOffsetFromToday(offset: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
+}
+
+
 export const db = {
 
     plants: [
@@ -83,7 +101,7 @@ export const db = {
             name: "Westwood Generation",
             county: "Schuylkill",
         },
-                {
+        {
             name: "Wheelabrator Frackville",
             county: "Schuylkill",
         }
@@ -104,6 +122,71 @@ export const db = {
     /* TDA drawing image paths, keyed by plant name. Put the images in /public, e.g. "/tda/limerick.png" */
     tdaDrawings: {} as Record<string, string>,
 
+
+    tasks: [
+        {
+            title: "Review inspection report",
+            plant: "Beaver Valley Nuclear Generating Station",
+            assignee: "John Doe",
+            dueDate: dateOffsetFromToday(3),
+            category: "Inspection",
+            description: `Review the inspection report for Beaver Valley Nuclear Generating Station.
+            Confirm that all items to be replaced in the next outage have been documented.`
+        },
+        {
+            title: "Approve maintenance work order",
+            assignee: "John Doe",
+            plant: "Limerick Generating Station",
+            dueDate: dateOffsetFromToday(6),
+            category: "Maintenance"
+        },
+        {
+            title: "Confirm contractor schedule",
+            assignee: "John Doe",
+            plant: "Peach Bottom Nuclear Generating Station",
+            dueDate: dateOffsetFromToday(10),
+            category: "Scheduling"
+        },
+        {
+            title: "Update equipment records",
+            assignee: "John Doe",
+            plant: "Susquehanna Steam Electric Station",
+            dueDate: dateOffsetFromToday(18),
+            category: "Records"
+        },
+        {
+            title: "Submit outage documentation",
+            assignee: "John Doe",
+            plant: "Keystone Generating Station",
+            dueDate: dateOffsetFromToday(-1),
+            category: "Documentation"
+        },
+        {
+            title: "Complete safety checklist",
+            assignee: "John Doe",
+            plant: "Conemaugh Generating Station",
+            dueDate: dateOffsetFromToday(-4),
+            category: "Safety"
+        },
+        {
+            title: "Schedule pump inspection",
+            assignee: "John Doe",
+            plant: "Brunner Island Steam Electric Station",
+            dueDate: dateOffsetFromToday(-9),
+            category: "Inspection"
+        },
+        {
+            title: "File contractor visit notes",
+            assignee: "John Doe",
+            plant: "Scrubgrass Generating Plant",
+            dueDate: dateOffsetFromToday(-16),
+            category: "Contractor visit"
+        },
+    ] as Task[]
+}
+
+export function replaceTasks(tasks: Task[]): void {
+    db.tasks = tasks;
 }
 
 /** One plant from the list above */

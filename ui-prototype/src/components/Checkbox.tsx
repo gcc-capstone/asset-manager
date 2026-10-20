@@ -17,7 +17,7 @@ export function Checkbox({ color, text }: CheckboxProps): React.JSX.Element {
         <input type="checkbox" defaultChecked id={inputID}
             className={`h-5 w-5 rounded border-gray-300 text-${color} focus:ring-${color}`} />
         <label htmlFor={inputID} className="app-label-text app-hover-text">
-            {text}
+            &nbsp;&nbsp;{text}
         </label>
     </div>
 }

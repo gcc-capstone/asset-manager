@@ -21,7 +21,15 @@ function upcomingOutages(plant: Plant) {
 /** ----------------------------------------------------------------------------------------------------------------
  * Shows one plant: a left sidebar with Outages, Info and Assets, and the selected section on the right.
  */
-function PlantDetailView({ plant, onBack }: { plant: Plant, onBack: () => void }): React.JSX.Element {
+function PlantDetailView({
+    plant,
+    onBack,
+    backToTasks = false,
+}: {
+    plant: Plant,
+    onBack: () => void,
+    backToTasks?: boolean,
+}): React.JSX.Element {
 
     /* State that holds the selected sidebar section */
     const [section, setSection] = useState<Section>("Outages");
@@ -35,9 +43,7 @@ function PlantDetailView({ plant, onBack }: { plant: Plant, onBack: () => void }
         return <div className="flex flex-col w-full">
 
         {/* Top: back link and plant name, above the sidebar */}
-        <span className="app-label-text app-hover-text cursor-pointer pb-2" onClick={onBack}>
-            ← All plants
-        </span>
+        <App.Subtitle text={backToTasks ? "← Back to tasks" : "← All plants"} onClick={onBack}/>
         <App.Title text={plant.name} />
         <div className="border-b-2 border-brand-blue mb-6" />
 
