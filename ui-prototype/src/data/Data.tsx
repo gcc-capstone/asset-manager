@@ -1,12 +1,24 @@
 
+/** A Top Assembly Drawing (TDA) file. `url` is an image or PDF path (e.g. "/tda/limerick-u1.png") or an uploaded file's URL. */
+export type Drawing = {
+    name: string,
+    url: string,
+}
+
 /** A scheduled outage at a plant. Dates are "YYYY-MM-DD". */
 export type Outage = {
+    id?: string,
     plant: string,
     start: string,
     end: string,
     type: string,
     description: string,
+    /* Top Assembly Drawings for the equipment this outage covers */
+    drawings?: Drawing[],
 }
+
+/** The outage types you can pick when adding an outage */
+export const outageTypes = ["Refueling", "Maintenance", "Inspection", "Forced"]
 
 export const db = {
 
