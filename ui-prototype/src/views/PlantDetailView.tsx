@@ -451,7 +451,12 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
                 <h2 className="text-2xl text-brand-blue">Top Assembly Drawings</h2>
                 <p className="mt-1 text-sm text-text-muted">{tdas.length} TDA{tdas.length === 1 ? "" : "s"} for this plant</p>
             </div>
-            <button className={formStyles.primaryButton} onClick={addTda}>+ Add TDA</button>
+            <div className="flex flex-wrap gap-2">
+                <button className={formStyles.ghostButton} disabled title="Excel export will be available once the spreadsheet format is defined.">
+                    Export to Excel
+                </button>
+                <button className={formStyles.primaryButton} onClick={addTda}>+ Add TDA</button>
+            </div>
         </div>
 
         {tdas.length === 0
