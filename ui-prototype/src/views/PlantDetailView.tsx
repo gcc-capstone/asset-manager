@@ -37,11 +37,18 @@ function isPdf(drawing: Drawing): boolean {
 /** ----------------------------------------------------------------------------------------------------------------
  * Shows one plant: a left sidebar with Outages, Info and Assets, and the selected section on the right.
  */
-function PlantDetailView({ plant, outages, onAddOutage, onBack }: {
+function PlantDetailView({
+    plant,
+    outages,
+    onAddOutage,
+    onBack,
+    backToTasks = false,
+}: {
     plant: Plant,
     outages: Outage[],
     onAddOutage: (outage: Outage) => void,
     onBack: () => void,
+    backToTasks?: boolean,
 }): React.JSX.Element {
 
     /* State that holds the selected sidebar section */
@@ -56,9 +63,7 @@ function PlantDetailView({ plant, outages, onAddOutage, onBack }: {
     return <div className="flex flex-col w-full">
 
         {/* Top: back link and plant name, above the sidebar */}
-        <span className="app-label-text app-hover-text cursor-pointer pb-2" onClick={onBack}>
-            ← All plants
-        </span>
+        <App.Subtitle text={backToTasks ? "← Back to tasks" : "← All plants"} onClick={onBack}/>
         <App.Title text={plant.name} />
         <div className="border-b-2 border-brand-blue mb-6" />
 
