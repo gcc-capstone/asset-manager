@@ -6,7 +6,7 @@ import CompaniesView from './views/CompaniesView'
 import ContractorReportView from './views/ContractorReportView'
 import TasksView from './views/TasksView'
 import { App } from './components/Components'
-import { type Plant, type Task } from './data/Data'
+import db, { type Outage, type Plant, type Task } from './data/Data'
 import { useState } from 'react'
 
 function Home(): React.JSX.Element {
@@ -22,6 +22,9 @@ function Home(): React.JSX.Element {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [plantOpenedFromTask, setPlantOpenedFromTask] = useState(false);
 
+  /* All outages. Kept here so ones added on a plant's page stay when you go back and reopen it. */
+  const [outages, setOutages] = useState<Outage[]>(db.outages);
+  
   /* Switching header tabs always goes back to that tab's starting page */
   function selectTab(tab: string) {
     setActiveTab(tab);
@@ -50,6 +53,8 @@ function Home(): React.JSX.Element {
       ? (selectedPlant
         ? <PlantDetailView
           plant={selectedPlant}
+          outages={outages}
+          onAddOutage={outage => setOutages(current => [...current, outage])}
           onBack={plantOpenedFromTask ? backToTasks : () => setSelectedPlant(null)}
           backToTasks={plantOpenedFromTask}
         />
