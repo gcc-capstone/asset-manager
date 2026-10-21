@@ -150,7 +150,7 @@ h1,h2,h3,.logo-text {
   /* style for subtitle text */
   .app-subtitle {
     font-weight: 400;
-    @apply text-xl text-text
+    @apply text-xl text-brand-blue
   };
 
   /* style for generic label text */
@@ -178,4 +178,11 @@ h1,h2,h3,.logo-text {
   .app-account-button-active {
     @apply ring-2 ring-brand-green ring-offset-2 ring-offset-main-background
   };
+
+  /* task card shown in Tasks view */
+  .task-card {
+    @apply w-full border border-line border-l-4 border-l-brand-blue bg-main-background-2 p-3 text-left;
+    @apply transition hover:border-brand-green hover:outline hover:outline-2 hover:outline-brand-green;
+    @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-green;
+  }
 }

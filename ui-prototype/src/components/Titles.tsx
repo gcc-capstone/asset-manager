@@ -29,8 +29,8 @@ export function Title({ text, onClick }: { text: string, onClick?: () => void })
  * @returns An instance of the React component
  */
 export function Subtitle({ text, onClick }: { text: string, onClick?: () => void }): React.JSX.Element {
-    return <span
+    return <div
         className={`app-subtitle ${onClick ? "app-hover-text" : ""}`}
         onClick={onClick}>{text}
-    </span>
+    </div>
 }

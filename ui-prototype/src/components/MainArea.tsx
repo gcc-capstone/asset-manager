@@ -27,7 +27,7 @@ export function MainArea({ children, activeTab, onTabSelect }: MainAreaProps): R
 
                 {/* Header navigation links, to the right of the logo. The current page gets a green underline. */}
                 <nav className="app-shell-navigation flex items-stretch gap-8 self-stretch">
-                    {["Admin", "Parts", "Plants", "Tasks"].map((label) =>
+                    {["Admin", "Technical", "Plants", "Tasks"].map((label) =>
                         <button
                             key={label}
                             className="app-header-link"
