@@ -6,7 +6,7 @@ import AdminView from './views/AdminView'
 import CompaniesView from './views/CompaniesView'
 import ContractorReportView from './views/ContractorReportView'
 import { App } from './components/Components'
-import { type Plant } from './data/Data'
+import db, { type Outage, type Plant } from './data/Data'
 import { useState } from 'react'
 
 function Home(): React.JSX.Element {
@@ -20,6 +20,9 @@ function Home(): React.JSX.Element {
   /* State that holds the plant opened from the Plants tab (null = show the list) */
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
 
+  /* All outages. Kept here so ones added on a plant's page stay when you go back and reopen it. */
+  const [outages, setOutages] = useState<Outage[]>(db.outages);
+  
   /* Switching header tabs always goes back to that tab's starting page */
   function selectTab(tab: string) {
     setActiveTab(tab);
@@ -32,7 +35,11 @@ function Home(): React.JSX.Element {
 
       /* Plants tab: the plant list, or one plant's page once it's clicked */
       ? (selectedPlant
-        ? <PlantDetailView plant={selectedPlant} onBack={() => setSelectedPlant(null)} />
+        ? <PlantDetailView
+            plant={selectedPlant}
+            outages={outages}
+            onAddOutage={outage => setOutages(current => [...current, outage])}
+            onBack={() => setSelectedPlant(null)} />
         : <div className="px-6 py-4">
           <PlantsView onSelect={setSelectedPlant} />
         </div>)
