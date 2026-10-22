@@ -6,7 +6,7 @@ import CompaniesView from './views/CompaniesView'
 import ContractorReportView from './views/ContractorReportView'
 import TasksView from './views/TasksView'
 import { App } from './components/Components'
-import db, { type Outage, type Plant, type Task, type Tad } from './data/Data'
+import db, { seededTads, type Outage, type Plant, type Task, type Tad } from './data/Data'
 import { useState } from 'react'
 
 function Home(): React.JSX.Element {
@@ -26,21 +26,7 @@ function Home(): React.JSX.Element {
   const [outages, setOutages] = useState<Outage[]>(db.outages);
 
   /* TADs are prototype state so edits persist while navigating between plants. */
-  const [tads, setTads] = useState<Tad[]>(() =>
-    Object.entries(db.tadDrawings).map(([plant, url]) => ({
-      id: `tad-existing-${plant}`,
-      plant,
-      name: `${plant} TAD`,
-      tagNumber: "",
-      installationStatus: "Not installed",
-      operationalStatus: "Unknown",
-      installDate: "",
-      lastMaintenanceDate: "",
-      nextMaintenanceDate: "",
-      drawing: { name: `${plant} TAD`, url },
-      parts: [],
-    }))
-  );
+  const [tads, setTads] = useState<Tad[]>(() => seededTads);
   
   /* Switching header tabs always goes back to that tab's starting page */
   function selectTab(tab: string) {

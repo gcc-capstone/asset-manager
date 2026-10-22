@@ -237,9 +237,26 @@ function TadThumbnail({ tad, className = "" }: { tad: Tad, className?: string })
         return <span className={`flex items-center justify-center text-xs text-text-muted ${className}`}>No drawing</span>
     }
     if (isPdf(tad.drawing)) {
-        return <span className={`flex items-center justify-center text-xl font-bold text-text-muted ${className}`}>PDF</span>
+        return <span title={tad.drawing.name} className={`flex flex-col items-center justify-center overflow-hidden px-1 text-center text-xs text-text-muted ${className}`}>
+            <span className="font-bold">PDF</span>
+            <span className="w-full truncate">{tad.drawing.name}</span>
+        </span>
     }
     return <img src={tad.drawing.url} alt="" className={`w-full bg-white object-contain ${className}`} />
+}
+
+/** A drawing attachment that opens PDFs directly and previews image drawings inline. */
+function TadDrawingAttachment({ drawing, alt }: { drawing: Drawing, alt: string }): React.JSX.Element {
+    if (isPdf(drawing)) {
+        return <a href={drawing.url} target="_blank" rel="noreferrer"
+            className="flex max-w-full flex-col items-start gap-1 rounded-lg border border-line bg-main-background-2 p-4 text-left hover:border-brand-green">
+            <span className="font-semibold text-brand-blue">PDF drawing</span>
+            <span className="break-all text-sm text-text-muted">{drawing.name}</span>
+            <span className="text-sm font-semibold text-brand-green">Open PDF in new tab ↗</span>
+        </a>
+    }
+    return <img src={drawing.url} alt={alt}
+        className="max-h-96 max-w-full self-start rounded-lg border border-line bg-white object-contain" />
 }
 
 /** ----------------------------------------------------------------------------------------------------------------
@@ -708,17 +725,17 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                         </section>}
 
                         {editorTab === "Image Upload" && <section className="flex flex-col gap-3">
-                            <h3 className="font-semibold text-brand-blue">TAD picture</h3>
+                            <h3 className="font-semibold text-brand-blue">TAD drawing</h3>
                             <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-line px-4 py-5 text-center transition-colors hover:border-brand-green">
-                                <span className="font-semibold text-brand-blue">{selectedTad.drawing ? "Replace drawing" : "Choose a picture"}</span>
-                                <span className="text-sm text-text-muted">Image files</span>
-                                <input type="file" accept="image/*" className="sr-only"
+                                <span className="font-semibold text-brand-blue">{selectedTad.drawing ? "Replace drawing" : "Choose a drawing"}</span>
+                                <span className="text-sm text-text-muted">Image or PDF files</span>
+                                <input type="file" accept="image/*,.pdf,application/pdf" className="sr-only"
                                     onChange={e => { setDrawing(e.target.files?.[0]); e.target.value = "" }} />
                             </label>
                             {selectedTad.drawing &&
                                 <div className="flex flex-col gap-2">
-                                    <img src={selectedTad.drawing.url} alt={`TAD drawing for ${selectedTad.name}`}
-                                        className="max-h-96 max-w-full self-start rounded-lg border-2 border-brand-blue bg-white object-contain" />
+                                    <TadDrawingAttachment drawing={selectedTad.drawing}
+                                        alt={`TAD drawing for ${selectedTad.name}`} />
                                     <button className={`${formStyles.ghostButton} self-start`}
                                         onClick={() => {
                                             if (selectedTad.drawing?.url.startsWith("blob:")) URL.revokeObjectURL(selectedTad.drawing.url);
@@ -798,8 +815,8 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                             </section>
                             {selectedTad.drawing && <section className="flex flex-col gap-2 border-t border-line pt-4">
                                 <h3 className="font-semibold text-brand-blue">Drawing</h3>
-                                <img src={selectedTad.drawing.url} alt={`TAD drawing for ${selectedTad.name}`}
-                                    className="max-h-96 max-w-full self-start rounded border border-line bg-white object-contain" />
+                                <TadDrawingAttachment drawing={selectedTad.drawing}
+                                    alt={`TAD drawing for ${selectedTad.name}`} />
                             </section>}
                         </div>}
 
