@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import db, { outageTypes, type Drawing, type Outage, type Plant, type Tda, type TdaPart } from '../data/Data'
 import { App } from "../components/Components"
 import { Modal, formStyles } from '../components/Modal'
@@ -384,9 +384,29 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
 }): React.JSX.Element {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [confirmingDelete, setConfirmingDelete] = useState(false);
-    const selectedTda = tdas.find(tda => tda.id === selectedId) ?? null;
+    const [draftTda, setDraftTda] = useState<Tda | null>(null);
+    const [isNewTda, setIsNewTda] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [toast, setToast] = useState("");
+    const [isToastExiting, setIsToastExiting] = useState(false);
+    const selectedTda = draftTda?.id === selectedId
+        ? draftTda
+        : tdas.find(tda => tda.id === selectedId) ?? null;
+    const visibleTdas = draftTda && isNewTda ? [...tdas, draftTda] : tdas;
+
+    useEffect(() => {
+        if (!toast) return;
+        setIsToastExiting(false);
+        const exitTimeout = window.setTimeout(() => setIsToastExiting(true), 3000);
+        const removeTimeout = window.setTimeout(() => setToast(""), 3350);
+        return () => {
+            window.clearTimeout(exitTimeout);
+            window.clearTimeout(removeTimeout);
+        };
+    }, [toast]);
 
     function addTda() {
+        if (draftTda?.drawing?.url.startsWith("blob:")) URL.revokeObjectURL(draftTda.drawing.url);
         const tda: Tda = {
             id: `tda-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             plant: plant.name,
@@ -400,12 +420,14 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
             drawing: null,
             parts: [],
         };
-        onAddTda(tda);
+        setDraftTda(tda);
+        setIsNewTda(true);
+        setIsEditing(true);
         setSelectedId(tda.id);
     }
 
     function update(patch: Partial<Tda>) {
-        if (selectedTda) onUpdateTda({ ...selectedTda, ...patch });
+        if (selectedTda && isEditing) setDraftTda({ ...selectedTda, ...patch });
     }
 
     function updatePart(partId: string, patch: Partial<TdaPart>) {
@@ -433,8 +455,49 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
 
     function setDrawing(file: File | undefined) {
         if (!file) return;
-        if (selectedTda?.drawing?.url.startsWith("blob:")) URL.revokeObjectURL(selectedTda.drawing.url);
         update({ drawing: { name: file.name, url: URL.createObjectURL(file) } });
+    }
+
+    function beginEdit() {
+        if (!selectedTda) return;
+        setDraftTda({ ...selectedTda, parts: selectedTda.parts.map(part => ({ ...part })) });
+        setIsNewTda(false);
+        setIsEditing(true);
+    }
+
+    function confirmTda() {
+        if (!selectedTda || !isEditing) return;
+
+        const savedTda = draftTda ?? selectedTda;
+        const previousTda = tdas.find(tda => tda.id === savedTda.id);
+        if (previousTda?.drawing?.url.startsWith("blob:")
+            && previousTda.drawing.url !== savedTda.drawing?.url) {
+            URL.revokeObjectURL(previousTda.drawing.url);
+        }
+
+        if (isNewTda) {
+            onAddTda(savedTda);
+            setToast("TDA added.");
+        } else {
+            onUpdateTda(savedTda);
+            setToast("TDA changes saved.");
+        }
+        setDraftTda(null);
+        setIsNewTda(false);
+        setIsEditing(false);
+    }
+
+    function cancelEdit() {
+        if (!selectedTda) return;
+        const original = tdas.find(tda => tda.id === selectedTda.id);
+        if (selectedTda.drawing?.url.startsWith("blob:")
+            && selectedTda.drawing.url !== original?.drawing?.url) {
+            URL.revokeObjectURL(selectedTda.drawing.url);
+        }
+        if (isNewTda) setSelectedId(null);
+        setDraftTda(null);
+        setIsNewTda(false);
+        setIsEditing(false);
     }
 
     function deleteSelectedTda() {
@@ -455,19 +518,29 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
                 <button className={formStyles.ghostButton} disabled title="Excel export will be available once the spreadsheet format is defined.">
                     Export to Excel
                 </button>
-                <button className={formStyles.primaryButton} onClick={addTda}>+ Add TDA</button>
+                <button className={formStyles.primaryButton} onClick={addTda} disabled={isEditing}>+ Add TDA</button>
             </div>
         </div>
 
-        {tdas.length === 0
+        {visibleTdas.length === 0
             ? <p className="rounded-lg border border-dashed border-line p-8 text-center text-text-muted">
                 No TDAs on file for this plant. Add one to record its details and parts.
             </p>
             : <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(14rem,0.7fr)_minmax(0,1.5fr)]">
                 <ul className="flex flex-col gap-2">
-                    {tdas.map(tda =>
+                    {visibleTdas.map(tda =>
                         <li key={tda.id}>
-                            <button onClick={() => setSelectedId(tda.id)}
+                            <button disabled={isEditing && selectedId !== tda.id} onClick={() => {
+                                if (selectedId === tda.id) return;
+                                if (draftTda?.drawing?.url.startsWith("blob:")
+                                    && draftTda.drawing.url !== tdas.find(item => item.id === draftTda.id)?.drawing?.url) {
+                                    URL.revokeObjectURL(draftTda.drawing.url);
+                                }
+                                setDraftTda(null);
+                                setIsNewTda(false);
+                                setIsEditing(false);
+                                setSelectedId(tda.id);
+                            }}
                                 className={`flex w-full flex-col gap-1 rounded-lg border p-4 text-left transition-colors ${selectedId === tda.id ? "border-brand-green bg-main-background-2" : "border-line hover:border-brand-blue"}`}>
                                 <span className="font-semibold text-brand-blue">{tda.name || "Unnamed TDA"}</span>
                                 <span className="text-sm text-text-muted">{tda.tagNumber || "No tag number"} · {tda.installationStatus}</span>
@@ -476,6 +549,7 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
                 </ul>
                 {selectedTda
                     ? <div className="flex min-w-0 flex-col gap-5 rounded-lg border border-line bg-main-background-2 p-5">
+                        <fieldset disabled={!isEditing} className="flex min-w-0 flex-col gap-5 border-0 p-0">
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <label className="flex flex-col gap-1">
                                 <span className={formStyles.label}>TDA name</span>
@@ -575,12 +649,25 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
                                         }}>Remove picture</button>
                                 </div>}
                         </section>
+                        </fieldset>
 
-                        <div className="flex justify-end border-t border-line pt-4">
-                            <button className="rounded-lg border border-red-500 px-4 py-2 font-semibold text-red-500 transition-colors hover:bg-red-500 hover:text-white cursor-pointer"
-                                onClick={() => setConfirmingDelete(true)}>
-                                Delete TDA
-                            </button>
+                        <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
+                            {isEditing
+                                ? <>
+                                    <button className={formStyles.ghostButton} onClick={cancelEdit}>
+                                        {isNewTda ? "Discard TDA" : "Cancel"}
+                                    </button>
+                                    <button className={formStyles.primaryButton} onClick={confirmTda}>
+                                        {isNewTda ? "Confirm TDA" : "Confirm changes"}
+                                    </button>
+                                </>
+                                : <>
+                                    <button className={formStyles.ghostButton} onClick={beginEdit}>Edit TDA</button>
+                                    <button className="rounded-lg border border-red-500 px-4 py-2 font-semibold text-red-500 transition-colors hover:bg-red-500 hover:text-white cursor-pointer"
+                                        onClick={() => setConfirmingDelete(true)}>
+                                        Delete TDA
+                                    </button>
+                                </>}
                         </div>
                     </div>
                     : <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed border-line p-6 text-center text-text-muted">
@@ -598,6 +685,11 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
                         This action is permanent and cannot be undone.
                     </p>
             </Modal>}
+        {toast &&
+            <div role="status" aria-live="polite"
+                className={`fixed right-5 top-5 z-50 rounded-lg bg-brand-green px-5 py-3 font-semibold text-white shadow-lg ${isToastExiting ? "toast-slide-out" : "toast-slide-in"}`}>
+                {toast}
+            </div>}
     </div>
 }
 
