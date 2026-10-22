@@ -99,7 +99,7 @@ function TaskDetailView({
         setIsEditing(false);
     }
 
-    return <section className="flex flex-col border border-line bg-main-background-2 p-4">
+    return <section className="flex max-h-[calc(100dvh-15rem)] min-h-0 flex-col border border-line bg-main-background-2 p-4">
         <button
             type="button"
             onClick={() => onTaskSelect(null)}
@@ -111,8 +111,8 @@ function TaskDetailView({
         <span className="text-sm text-text-muted">Task</span>
         <App.Title text={task.title} />
 
-        <form ref={formRef} className="flex min-h-0 flex-1 flex-col" onSubmit={saveTask}>
-            <div className="mt-4 space-y-3">
+        <form ref={formRef} className="flex min-h-0 flex-1 flex-col overflow-hidden" onSubmit={saveTask}>
+            <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto">
                 <div>
                     <div className="text-sm text-text-muted">Plant</div>
                     <div>
@@ -202,7 +202,7 @@ function TaskDetailView({
                 </div>
             </div>
 
-            <div className={`mt-auto flex gap-3 pt-93 ${isEditing ? "justify-end" : "justify-start"}`}>
+            <div className={`flex shrink-0 gap-3 bg-main-background-2 pt-6 ${isEditing ? "justify-end" : "justify-start"}`}>
                 {isEditing
                     ? <>
                         <button
@@ -327,7 +327,7 @@ function TasksView({
         setNewTask(null);
     }
 
-    return <div className="grid min-h-[32rem] w-full grid-cols-2 gap-30">
+    return <div className="grid min-h-[32rem] w-full grid-cols-2 items-start gap-30">
         <div className="flex min-w-0 flex-col gap-4">
             <button
                 type="button"
@@ -345,7 +345,7 @@ function TasksView({
                 onTaskClick={onTaskSelect}
             />
         </div>
-        <div className={`relative min-w-0 ${selectedTask ? "pt-12.5" : ""}`}>
+        <div className={`relative min-w-0 ${selectedTask ? "min-h-0 pt-12.5" : ""}`}>
             {selectedTask
                 ? <TaskDetailView
                     key={selectedTask.title}
