@@ -8,9 +8,16 @@ export type Drawing = {
 export type TdaPart = {
     id: string,
     partNumber: string,
-    name: string,
-    installedQuantity: number,
-    spareQuantity: number,
+    customerNumber?: string,
+    location?: string,
+    description: string,
+    taItemNum: string,
+    qtyPerValve: number,
+    qtyUsed: number,
+    qtyInStock: number,
+    qtyNeeded: number,
+    qtyToBuy: number,
+    deliveryWeeks: number,
 }
 
 export type Tda = {
@@ -154,7 +161,6 @@ export const db = {
 
     /* TDA drawing image paths, keyed by plant name. Put the images in /public, e.g. "/tda/limerick.png" */
     tdaDrawings: {} as Record<string, string>,
-
 
     tasks: [
         {
