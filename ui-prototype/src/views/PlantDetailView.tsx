@@ -373,7 +373,7 @@ function PlantInfo({ plant, outages }: { plant: Plant, outages: Outage[] }): Rea
 }
 
 /** ----------------------------------------------------------------------------------------------------------------
- * A plant's assets: its Top Assembly Drawing (TDA) and its Bill of Materials (BOM), on two sub-tabs
+ * A plant's top assembly drawings and their editable parts lists
  */
 function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
     plant: Plant,
@@ -390,6 +390,9 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
     const [toast, setToast] = useState("");
     const [isToastExiting, setIsToastExiting] = useState(false);
     const [showLocation, setShowLocation] = useState(true);
+    const [editorTab, setEditorTab] = useState<"General Info" | "Parts Info" | "Image Upload">("General Info");
+    const editorTabs = ["General Info", "Parts Info", "Image Upload"] as const;
+    const editorTabIndex = editorTabs.indexOf(editorTab);
     const selectedTda = draftTda?.id === selectedId
         ? draftTda
         : tdas.find(tda => tda.id === selectedId) ?? null;
@@ -424,6 +427,7 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
         setDraftTda(tda);
         setIsNewTda(true);
         setIsEditing(true);
+        setEditorTab("General Info");
         setSelectedId(tda.id);
     }
 
@@ -471,6 +475,7 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
         setDraftTda({ ...selectedTda, parts: selectedTda.parts.map(part => ({ ...part })) });
         setIsNewTda(false);
         setIsEditing(true);
+        setEditorTab("General Info");
     }
 
     function confirmTda() {
@@ -557,8 +562,16 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
                 </ul>
                 {selectedTda
                     ? <div className="flex min-w-0 flex-col gap-5 rounded-lg border border-line bg-main-background-2 p-5">
-                        <fieldset disabled={!isEditing} className="flex min-w-0 flex-col gap-5 border-0 p-0">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {isEditing && <div role="tablist" aria-label="TDA details" className="grid grid-cols-3 border-b border-line">
+                            {editorTabs.map((tab, index) =>
+                                <button key={tab} type="button" role="tab" aria-selected={editorTab === tab}
+                                    onClick={() => setEditorTab(tab)}
+                                    className={`border-b-2 px-2 py-3 text-center text-sm font-semibold transition-colors sm:text-base ${editorTab === tab ? "border-brand-green text-brand-blue" : "border-transparent text-text-muted hover:text-brand-blue"}`}>
+                                    <span className="mr-1.5 text-xs text-text-muted">{index + 1}.</span>{tab}
+                                </button>)}
+                        </div>}
+                        {isEditing && <fieldset className="flex min-w-0 flex-col gap-5 border-0 p-0">
+                        {editorTab === "General Info" && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <label className="flex flex-col gap-1">
                                 <span className={formStyles.label}>TDA name</span>
                                 <input className={formStyles.input} value={selectedTda.name}
@@ -598,9 +611,9 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
                                 <input type="date" className={formStyles.input} value={selectedTda.nextMaintenanceDate}
                                     onChange={e => update({ nextMaintenanceDate: e.target.value })} />
                             </label>
-                        </div>
+                        </div>}
 
-                        <section className="flex flex-col gap-3 border-t border-line pt-4">
+                        {editorTab === "Parts Info" && <section className="flex flex-col gap-3">
                             <div className="flex items-center justify-between gap-3">
                                 <h3 className="font-semibold text-brand-blue">Parts list</h3>
                                 <button className={formStyles.ghostButton} onClick={addPart} disabled={!isEditing}>+ Add part</button>
@@ -659,9 +672,9 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
                                             </div>
                                         </div>)}
                                 </div>}
-                        </section>
+                        </section>}
 
-                        <section className="flex flex-col gap-3 border-t border-line pt-4">
+                        {editorTab === "Image Upload" && <section className="flex flex-col gap-3">
                             <h3 className="font-semibold text-brand-blue">TDA picture</h3>
                             <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-line px-4 py-5 text-center transition-colors hover:border-brand-green">
                                 <span className="font-semibold text-brand-blue">{selectedTda.drawing ? "Replace drawing" : "Choose a picture"}</span>
@@ -679,8 +692,83 @@ function PlantAssets({ plant, tdas, onAddTda, onUpdateTda, onDeleteTda }: {
                                             update({ drawing: null });
                                         }}>Remove picture</button>
                                 </div>}
-                        </section>
-                        </fieldset>
+                        </section>}
+                        <div className="flex justify-between border-t border-line pt-4">
+                            <button type="button" className={formStyles.ghostButton} disabled={editorTabIndex === 0}
+                                onClick={() => setEditorTab(editorTabs[editorTabIndex - 1])}>Previous</button>
+                            {editorTabIndex < editorTabs.length - 1 &&
+                                <button type="button" className={formStyles.primaryButton}
+                                    onClick={() => setEditorTab(editorTabs[editorTabIndex + 1])}>Continue</button>}
+                        </div>
+                        </fieldset>}
+
+                        {!isEditing && <div className="flex flex-col gap-5">
+                            <section>
+                                <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                                    <div>
+                                        <h3 className="text-xl font-semibold text-brand-blue">{selectedTda.name || "Unnamed TDA"}</h3>
+                                        <p className="text-sm text-text-muted">{selectedTda.tagNumber || "No tag number"}</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                                        <span className="rounded-full bg-brand-light-green px-3 py-1 text-brand-green">{selectedTda.installationStatus}</span>
+                                        <span className="rounded-full bg-main-background px-3 py-1 text-text-muted">{selectedTda.operationalStatus}</span>
+                                    </div>
+                                </div>
+                                <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                    {[
+                                        ["Install date", selectedTda.installDate ? formatDate(selectedTda.installDate) : "Not recorded"],
+                                        ["Last maintenance", selectedTda.lastMaintenanceDate ? formatDate(selectedTda.lastMaintenanceDate) : "Not recorded"],
+                                        ["Next maintenance", selectedTda.nextMaintenanceDate ? formatDate(selectedTda.nextMaintenanceDate) : "Not scheduled"],
+                                    ].map(([label, value]) =>
+                                        <div key={label} className="rounded border border-line bg-main-background px-3 py-2">
+                                            <dt className="text-xs font-semibold uppercase text-text-muted">{label}</dt>
+                                            <dd className="mt-1 font-medium text-text">{value}</dd>
+                                        </div>)}
+                                </dl>
+                            </section>
+                            <section className="flex flex-col gap-3 border-t border-line pt-4">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <h3 className="font-semibold text-brand-blue">Parts ({selectedTda.parts.length})</h3>
+                                    {selectedTda.parts.some(part => part.location) &&
+                                        <label className="flex cursor-pointer items-center gap-2 text-sm text-text">
+                                            <input type="checkbox" className={formStyles.checkbox} checked={showLocation}
+                                                onChange={e => setShowLocation(e.target.checked)} />
+                                            Warehouse location
+                                        </label>}
+                                </div>
+                                {selectedTda.parts.length === 0
+                                    ? <p className="rounded border border-dashed border-line p-5 text-center text-sm text-text-muted">No parts recorded.</p>
+                                    : <div className="overflow-x-auto rounded border border-line">
+                                        <table className="w-full border-collapse text-sm">
+                                            <thead><tr className="bg-main-background text-left text-text-muted">
+                                                {["Part #", "Customer #", "Description", ...(showLocation ? ["Location"] : []), "TA item #", "Qty / valve", "Qty used", "In stock", "Qty needed", "Qty to buy", "Delivery (weeks)"].map(label =>
+                                                    <th key={label} className="whitespace-nowrap border-b border-line px-3 py-2 font-semibold">{label}</th>)}
+                                            </tr></thead>
+                                            <tbody>
+                                                {selectedTda.parts.map(part =>
+                                                    <tr key={part.id} className="border-b border-line last:border-0">
+                                                        <td className="whitespace-nowrap px-3 py-2 font-semibold text-brand-blue">{part.partNumber || "—"}</td>
+                                                        <td className="whitespace-nowrap px-3 py-2">{part.customerNumber || "—"}</td>
+                                                        <td className="min-w-48 px-3 py-2">{part.description || "—"}</td>
+                                                        {showLocation && <td className="whitespace-nowrap px-3 py-2">{part.location || "—"}</td>}
+                                                        <td className="whitespace-nowrap px-3 py-2">{part.taItemNum || "—"}</td>
+                                                        <td className="px-3 py-2 text-right tabular-nums">{part.qtyPerValve}</td>
+                                                        <td className="px-3 py-2 text-right tabular-nums">{part.qtyUsed}</td>
+                                                        <td className="px-3 py-2 text-right tabular-nums">{part.qtyInStock}</td>
+                                                        <td className="px-3 py-2 text-right tabular-nums">{part.qtyNeeded}</td>
+                                                        <td className={`px-3 py-2 text-right tabular-nums ${part.qtyToBuy > 0 ? "font-bold text-red-500" : ""}`}>{part.qtyToBuy}</td>
+                                                        <td className="px-3 py-2 text-right tabular-nums">{part.deliveryWeeks}</td>
+                                                    </tr>)}
+                                            </tbody>
+                                        </table>
+                                    </div>}
+                            </section>
+                            {selectedTda.drawing && <section className="flex flex-col gap-2 border-t border-line pt-4">
+                                <h3 className="font-semibold text-brand-blue">Drawing</h3>
+                                <img src={selectedTda.drawing.url} alt={`TDA drawing for ${selectedTda.name}`}
+                                    className="max-h-96 max-w-full self-start rounded border border-line bg-white object-contain" />
+                            </section>}
+                        </div>}
 
                         <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
                             {isEditing
