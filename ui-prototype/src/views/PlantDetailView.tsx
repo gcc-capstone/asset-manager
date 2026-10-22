@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react'
 import db, { outageTypes, type Drawing, type Outage, type Plant } from '../data/Data'
 import { App } from "../components/Components"
 import { Modal, formStyles } from '../components/Modal'
+import PlantBom from './PlantBom'
 
 /** The sections listed in the left sidebar when a plant is open */
 type Section = "Outages" | "Info" | "Assets"
@@ -360,9 +361,30 @@ function PlantInfo({ plant, outages }: { plant: Plant, outages: Outage[] }): Rea
 }
 
 /** ----------------------------------------------------------------------------------------------------------------
- * The plant's Top Assembly Drawing (TDA), or a placeholder if there isn't one yet
+ * A plant's assets: its Top Assembly Drawing (TDA) and its Bill of Materials (BOM), on two sub-tabs
  */
 function PlantAssets({ plant }: { plant: Plant }): React.JSX.Element {
+    const tabs = ["Top Assembly Drawing", "Bill of Materials"] as const
+    const [tab, setTab] = useState<typeof tabs[number]>("Bill of Materials");
+
+    return <div className="flex flex-col gap-4">
+        <div className="flex gap-6 border-b border-line">
+            {tabs.map(name =>
+                <button key={name} onClick={() => setTab(name)}
+                    className={`-mb-px border-b-4 pb-1 text-xl cursor-pointer transition-colors ${tab === name ? "border-brand-green text-brand-blue" : "border-transparent text-text-muted hover:text-brand-green"}`}
+                    style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}>
+                    {name}
+                </button>)}
+        </div>
+        {tab === "Top Assembly Drawing" && <PlantDrawing plant={plant} />}
+        {tab === "Bill of Materials" && <PlantBom plant={plant} />}
+    </div>
+}
+
+/** ----------------------------------------------------------------------------------------------------------------
+ * The plant's Top Assembly Drawing (TDA), or a placeholder if there isn't one yet
+ */
+function PlantDrawing({ plant }: { plant: Plant }): React.JSX.Element {
     const drawing = db.tdaDrawings[plant.name];
 
     return <div className="flex flex-col gap-4">
