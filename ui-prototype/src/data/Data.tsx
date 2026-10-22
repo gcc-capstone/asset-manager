@@ -8,9 +8,16 @@ export type Drawing = {
 export type TadPart = {
     id: string,
     partNumber: string,
-    name: string,
-    installedQuantity: number,
-    spareQuantity: number,
+    customerNumber?: string,
+    location?: string,
+    description: string,
+    tadItemNum: string,
+    qtyPerValve: number,
+    qtyUsed: number,
+    qtyInStock: number,
+    qtyNeeded: number,
+    qtyToBuy: number,
+    deliveryWeeks: number,
 }
 
 export type Tad = {
@@ -154,7 +161,6 @@ export const db = {
 
     /* TAD drawing image paths, keyed by plant name. Put the images in /public, e.g. "/tad/limerick.png" */
     tadDrawings: {} as Record<string, string>,
-
 
     tasks: [
         {

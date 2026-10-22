@@ -373,7 +373,7 @@ function PlantInfo({ plant, outages }: { plant: Plant, outages: Outage[] }): Rea
 }
 
 /** ----------------------------------------------------------------------------------------------------------------
- * The plant's Top Assembly Drawing (TAD), or a placeholder if there isn't one yet
+ * A plant's Top Assembly Drawings and their editable parts lists
  */
 function PlantAssets({ plant, tads, onAddTad, onUpdateTad, onDeleteTad }: {
     plant: Plant,
@@ -389,6 +389,10 @@ function PlantAssets({ plant, tads, onAddTad, onUpdateTad, onDeleteTad }: {
     const [isEditing, setIsEditing] = useState(false);
     const [toast, setToast] = useState("");
     const [isToastExiting, setIsToastExiting] = useState(false);
+    const [showLocation, setShowLocation] = useState(true);
+    const [editorTab, setEditorTab] = useState<"General Info" | "Parts Info" | "Image Upload">("General Info");
+    const editorTabs = ["General Info", "Parts Info", "Image Upload"] as const;
+    const editorTabIndex = editorTabs.indexOf(editorTab);
     const selectedTad = draftTad?.id === selectedId
         ? draftTad
         : tads.find(tad => tad.id === selectedId) ?? null;
@@ -423,6 +427,7 @@ function PlantAssets({ plant, tads, onAddTad, onUpdateTad, onDeleteTad }: {
         setDraftTad(tad);
         setIsNewTad(true);
         setIsEditing(true);
+        setEditorTab("General Info");
         setSelectedId(tad.id);
     }
 
@@ -442,9 +447,16 @@ function PlantAssets({ plant, tads, onAddTad, onUpdateTad, onDeleteTad }: {
             parts: [...selectedTad.parts, {
                 id: `part-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                 partNumber: "",
-                name: "",
-                installedQuantity: 0,
-                spareQuantity: 0,
+                customerNumber: "",
+                location: "",
+                description: "",
+                tadItemNum: "",
+                qtyPerValve: 0,
+                qtyUsed: 0,
+                qtyInStock: 0,
+                qtyNeeded: 0,
+                qtyToBuy: 0,
+                deliveryWeeks: 0,
             }],
         });
     }
@@ -463,6 +475,7 @@ function PlantAssets({ plant, tads, onAddTad, onUpdateTad, onDeleteTad }: {
         setDraftTad({ ...selectedTad, parts: selectedTad.parts.map(part => ({ ...part })) });
         setIsNewTad(false);
         setIsEditing(true);
+        setEditorTab("General Info");
     }
 
     function confirmTad() {
@@ -549,8 +562,16 @@ function PlantAssets({ plant, tads, onAddTad, onUpdateTad, onDeleteTad }: {
                 </ul>
                 {selectedTad
                     ? <div className="flex min-w-0 flex-col gap-5 rounded-lg border border-line bg-main-background-2 p-5">
-                        <fieldset disabled={!isEditing} className="flex min-w-0 flex-col gap-5 border-0 p-0">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {isEditing && <div role="tablist" aria-label="TAD details" className="grid grid-cols-3 border-b border-line">
+                            {editorTabs.map((tab, index) =>
+                                <button key={tab} type="button" role="tab" aria-selected={editorTab === tab}
+                                    onClick={() => setEditorTab(tab)}
+                                    className={`border-b-2 px-2 py-3 text-center text-sm font-semibold transition-colors sm:text-base ${editorTab === tab ? "border-brand-green text-brand-blue" : "border-transparent text-text-muted hover:text-brand-blue"}`}>
+                                    <span className="mr-1.5 text-xs text-text-muted">{index + 1}.</span>{tab}
+                                </button>)}
+                        </div>}
+                        {isEditing && <fieldset className="flex min-w-0 flex-col gap-5 border-0 p-0">
+                        {editorTab === "General Info" && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <label className="flex flex-col gap-1">
                                 <span className={formStyles.label}>TAD name</span>
                                 <input className={formStyles.input} value={selectedTad.name}
@@ -590,47 +611,70 @@ function PlantAssets({ plant, tads, onAddTad, onUpdateTad, onDeleteTad }: {
                                 <input type="date" className={formStyles.input} value={selectedTad.nextMaintenanceDate}
                                     onChange={e => update({ nextMaintenanceDate: e.target.value })} />
                             </label>
-                        </div>
+                        </div>}
 
-                        <section className="flex flex-col gap-3 border-t border-line pt-4">
+                        {editorTab === "Parts Info" && <section className="flex flex-col gap-3">
                             <div className="flex items-center justify-between gap-3">
                                 <h3 className="font-semibold text-brand-blue">Parts list</h3>
-                                <button className={formStyles.ghostButton} onClick={addPart}>+ Add part</button>
+                                <button className={formStyles.ghostButton} onClick={addPart} disabled={!isEditing}>+ Add part</button>
                             </div>
+                            <label className="flex cursor-pointer items-center gap-2 text-sm text-text">
+                                <input type="checkbox" className={formStyles.checkbox} checked={showLocation}
+                                    onChange={e => setShowLocation(e.target.checked)} />
+                                Track warehouse location
+                            </label>
                             {selectedTad.parts.length === 0
                                 ? <p className="text-sm text-text-muted">No parts recorded yet.</p>
                                 : <div className="flex flex-col gap-3">
                                     {selectedTad.parts.map((part, index) =>
-                                        <div key={part.id} className="grid grid-cols-1 gap-2 rounded-lg border border-line p-3 sm:grid-cols-2">
+                                        <div key={part.id} className="grid grid-cols-1 gap-2 rounded-lg border border-line p-3 sm:grid-cols-2 xl:grid-cols-3">
                                             <label className="flex flex-col gap-1">
                                                 <span className={formStyles.label}>Part number</span>
                                                 <input className={formStyles.input} value={part.partNumber}
                                                     onChange={e => updatePart(part.id, { partNumber: e.target.value })} />
                                             </label>
                                             <label className="flex flex-col gap-1">
-                                                <span className={formStyles.label}>Part name</span>
-                                                <input className={formStyles.input} value={part.name}
-                                                    onChange={e => updatePart(part.id, { name: e.target.value })} />
+                                                <span className={formStyles.label}>Customer number</span>
+                                                <input className={formStyles.input} value={part.customerNumber ?? ""}
+                                                    onChange={e => updatePart(part.id, { customerNumber: e.target.value })} />
                                             </label>
                                             <label className="flex flex-col gap-1">
-                                                <span className={formStyles.label}>Installed quantity</span>
-                                                <input type="number" min="0" step="1" className={formStyles.input} value={part.installedQuantity}
-                                                    onChange={e => updatePart(part.id, { installedQuantity: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} />
+                                                <span className={formStyles.label}>Description</span>
+                                                <input className={formStyles.input} value={part.description}
+                                                    onChange={e => updatePart(part.id, { description: e.target.value })} />
                                             </label>
-                                            <div className="flex items-end gap-2">
-                                                <label className="flex flex-1 flex-col gap-1">
-                                                    <span className={formStyles.label}>Spare quantity</span>
-                                                    <input type="number" min="0" step="1" className={formStyles.input} value={part.spareQuantity}
-                                                        onChange={e => updatePart(part.id, { spareQuantity: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} />
-                                                </label>
+                                            {showLocation && <label className="flex flex-col gap-1">
+                                                <span className={formStyles.label}>Warehouse location</span>
+                                                <input className={formStyles.input} value={part.location ?? ""}
+                                                    onChange={e => updatePart(part.id, { location: e.target.value })} />
+                                            </label>}
+                                            <label className="flex flex-col gap-1">
+                                                <span className={formStyles.label}>TAD item number</span>
+                                                <input className={formStyles.input} value={part.tadItemNum}
+                                                    onChange={e => updatePart(part.id, { tadItemNum: e.target.value })} />
+                                            </label>
+                                            {([
+                                                ["Qty per valve", "qtyPerValve"],
+                                                ["Qty used", "qtyUsed"],
+                                                ["Qty in stock", "qtyInStock"],
+                                                ["Qty needed", "qtyNeeded"],
+                                                ["Qty to buy", "qtyToBuy"],
+                                                ["Delivery (weeks)", "deliveryWeeks"],
+                                            ] as const).map(([label, key]) =>
+                                                <label key={key} className="flex flex-col gap-1">
+                                                    <span className={formStyles.label}>{label}</span>
+                                                    <input type="number" min="0" step="1" className={formStyles.input} value={part[key]}
+                                                        onChange={e => updatePart(part.id, { [key]: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} />
+                                                </label>)}
+                                            <div className="flex items-end justify-end">
                                                 <button className={formStyles.ghostButton} aria-label={`Remove part ${index + 1}`}
                                                     onClick={() => removePart(part.id)}>Remove</button>
                                             </div>
                                         </div>)}
                                 </div>}
-                        </section>
+                        </section>}
 
-                        <section className="flex flex-col gap-3 border-t border-line pt-4">
+                        {editorTab === "Image Upload" && <section className="flex flex-col gap-3">
                             <h3 className="font-semibold text-brand-blue">TAD picture</h3>
                             <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-line px-4 py-5 text-center transition-colors hover:border-brand-green">
                                 <span className="font-semibold text-brand-blue">{selectedTad.drawing ? "Replace drawing" : "Choose a picture"}</span>
@@ -648,8 +692,83 @@ function PlantAssets({ plant, tads, onAddTad, onUpdateTad, onDeleteTad }: {
                                             update({ drawing: null });
                                         }}>Remove picture</button>
                                 </div>}
-                        </section>
-                        </fieldset>
+                        </section>}
+                        <div className="flex justify-between border-t border-line pt-4">
+                            <button type="button" className={formStyles.ghostButton} disabled={editorTabIndex === 0}
+                                onClick={() => setEditorTab(editorTabs[editorTabIndex - 1])}>Previous</button>
+                            {editorTabIndex < editorTabs.length - 1 &&
+                                <button type="button" className={formStyles.primaryButton}
+                                    onClick={() => setEditorTab(editorTabs[editorTabIndex + 1])}>Continue</button>}
+                        </div>
+                        </fieldset>}
+
+                        {!isEditing && <div className="flex flex-col gap-5">
+                            <section>
+                                <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                                    <div>
+                                        <h3 className="text-xl font-semibold text-brand-blue">{selectedTad.name || "Unnamed TAD"}</h3>
+                                        <p className="text-sm text-text-muted">{selectedTad.tagNumber || "No tag number"}</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                                        <span className="rounded-full bg-brand-light-green px-3 py-1 text-brand-green">{selectedTad.installationStatus}</span>
+                                        <span className="rounded-full bg-main-background px-3 py-1 text-text-muted">{selectedTad.operationalStatus}</span>
+                                    </div>
+                                </div>
+                                <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                    {[
+                                        ["Install date", selectedTad.installDate ? formatDate(selectedTad.installDate) : "Not recorded"],
+                                        ["Last maintenance", selectedTad.lastMaintenanceDate ? formatDate(selectedTad.lastMaintenanceDate) : "Not recorded"],
+                                        ["Next maintenance", selectedTad.nextMaintenanceDate ? formatDate(selectedTad.nextMaintenanceDate) : "Not scheduled"],
+                                    ].map(([label, value]) =>
+                                        <div key={label} className="rounded border border-line bg-main-background px-3 py-2">
+                                            <dt className="text-xs font-semibold uppercase text-text-muted">{label}</dt>
+                                            <dd className="mt-1 font-medium text-text">{value}</dd>
+                                        </div>)}
+                                </dl>
+                            </section>
+                            <section className="flex flex-col gap-3 border-t border-line pt-4">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <h3 className="font-semibold text-brand-blue">Parts ({selectedTad.parts.length})</h3>
+                                    {selectedTad.parts.some(part => part.location) &&
+                                        <label className="flex cursor-pointer items-center gap-2 text-sm text-text">
+                                            <input type="checkbox" className={formStyles.checkbox} checked={showLocation}
+                                                onChange={e => setShowLocation(e.target.checked)} />
+                                            Warehouse location
+                                        </label>}
+                                </div>
+                                {selectedTad.parts.length === 0
+                                    ? <p className="rounded border border-dashed border-line p-5 text-center text-sm text-text-muted">No parts recorded.</p>
+                                    : <div className="overflow-x-auto rounded border border-line">
+                                        <table className="w-full border-collapse text-sm">
+                                            <thead><tr className="bg-main-background text-left text-text-muted">
+                                                {["Part #", "Customer #", "Description", ...(showLocation ? ["Location"] : []), "TAD item #", "Qty / valve", "Qty used", "In stock", "Qty needed", "Qty to buy", "Delivery (weeks)"].map(label =>
+                                                    <th key={label} className="whitespace-nowrap border-b border-line px-3 py-2 font-semibold">{label}</th>)}
+                                            </tr></thead>
+                                            <tbody>
+                                                {selectedTad.parts.map(part =>
+                                                    <tr key={part.id} className="border-b border-line last:border-0">
+                                                        <td className="whitespace-nowrap px-3 py-2 font-semibold text-brand-blue">{part.partNumber || "—"}</td>
+                                                        <td className="whitespace-nowrap px-3 py-2">{part.customerNumber || "—"}</td>
+                                                        <td className="min-w-48 px-3 py-2">{part.description || "—"}</td>
+                                                        {showLocation && <td className="whitespace-nowrap px-3 py-2">{part.location || "—"}</td>}
+                                                        <td className="whitespace-nowrap px-3 py-2">{part.tadItemNum || "—"}</td>
+                                                        <td className="px-3 py-2 text-right tabular-nums">{part.qtyPerValve}</td>
+                                                        <td className="px-3 py-2 text-right tabular-nums">{part.qtyUsed}</td>
+                                                        <td className="px-3 py-2 text-right tabular-nums">{part.qtyInStock}</td>
+                                                        <td className="px-3 py-2 text-right tabular-nums">{part.qtyNeeded}</td>
+                                                        <td className={`px-3 py-2 text-right tabular-nums ${part.qtyToBuy > 0 ? "font-bold text-red-500" : ""}`}>{part.qtyToBuy}</td>
+                                                        <td className="px-3 py-2 text-right tabular-nums">{part.deliveryWeeks}</td>
+                                                    </tr>)}
+                                            </tbody>
+                                        </table>
+                                    </div>}
+                            </section>
+                            {selectedTad.drawing && <section className="flex flex-col gap-2 border-t border-line pt-4">
+                                <h3 className="font-semibold text-brand-blue">Drawing</h3>
+                                <img src={selectedTad.drawing.url} alt={`TAD drawing for ${selectedTad.name}`}
+                                    className="max-h-96 max-w-full self-start rounded border border-line bg-white object-contain" />
+                            </section>}
+                        </div>}
 
                         <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
                             {isEditing
