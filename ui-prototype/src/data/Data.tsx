@@ -5,6 +5,28 @@ export type Drawing = {
     url: string,
 }
 
+export type TdaPart = {
+    id: string,
+    partNumber: string,
+    name: string,
+    installedQuantity: number,
+    spareQuantity: number,
+}
+
+export type Tda = {
+    id: string,
+    plant: string,
+    name: string,
+    tagNumber: string,
+    installationStatus: "Installed" | "Spare" | "Not installed" | "Removed",
+    operationalStatus: "Active" | "Inactive" | "Unknown",
+    installDate: string,
+    lastMaintenanceDate: string,
+    nextMaintenanceDate: string,
+    drawing: Drawing | null,
+    parts: TdaPart[],
+}
+
 /** A scheduled outage at a plant. Dates are "YYYY-MM-DD". */
 export type Outage = {
     id?: string,
