@@ -6,7 +6,7 @@ import CompaniesView from './views/CompaniesView'
 import ContractorReportView from './views/ContractorReportView'
 import TasksView from './views/TasksView'
 import { App } from './components/Components'
-import db, { type Outage, type Plant, type Task, type Tda } from './data/Data'
+import db, { type Outage, type Plant, type Task, type Tad } from './data/Data'
 import { useState } from 'react'
 
 function Home(): React.JSX.Element {
@@ -25,19 +25,19 @@ function Home(): React.JSX.Element {
   /* All outages. Kept here so ones added on a plant's page stay when you go back and reopen it. */
   const [outages, setOutages] = useState<Outage[]>(db.outages);
 
-  /* TDAs are prototype state so edits persist while navigating between plants. */
-  const [tdas, setTdas] = useState<Tda[]>(() =>
-    Object.entries(db.tdaDrawings).map(([plant, url]) => ({
-      id: `tda-existing-${plant}`,
+  /* TADs are prototype state so edits persist while navigating between plants. */
+  const [tads, setTads] = useState<Tad[]>(() =>
+    Object.entries(db.tadDrawings).map(([plant, url]) => ({
+      id: `tad-existing-${plant}`,
       plant,
-      name: `${plant} TDA`,
+      name: `${plant} TAD`,
       tagNumber: "",
       installationStatus: "Not installed",
       operationalStatus: "Unknown",
       installDate: "",
       lastMaintenanceDate: "",
       nextMaintenanceDate: "",
-      drawing: { name: `${plant} TDA`, url },
+      drawing: { name: `${plant} TAD`, url },
       parts: [],
     }))
   );
@@ -71,11 +71,11 @@ function Home(): React.JSX.Element {
         ? <PlantDetailView
           plant={selectedPlant}
           outages={outages}
-          tdas={tdas}
+          tads={tads}
           onAddOutage={outage => setOutages(current => [...current, outage])}
-          onAddTda={tda => setTdas(current => [...current, tda])}
-          onUpdateTda={updated => setTdas(current => current.map(tda => tda.id === updated.id ? updated : tda))}
-          onDeleteTda={id => setTdas(current => current.filter(tda => tda.id !== id))}
+          onAddTad={tad => setTads(current => [...current, tad])}
+          onUpdateTad={updated => setTads(current => current.map(tad => tad.id === updated.id ? updated : tad))}
+          onDeleteTad={id => setTads(current => current.filter(tad => tad.id !== id))}
           onBack={plantOpenedFromTask ? backToTasks : () => setSelectedPlant(null)}
           backToTasks={plantOpenedFromTask}
         />

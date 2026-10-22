@@ -1,17 +1,17 @@
 
-/** A Top Assembly Drawing (TDA) file. `url` is an image or PDF path (e.g. "/tda/limerick-u1.png") or an uploaded file's URL. */
+/** A Top Assembly Drawing (TAD) file. `url` is an image or PDF path (e.g. "/tad/limerick-u1.png") or an uploaded file's URL. */
 export type Drawing = {
     name: string,
     url: string,
 }
 
-export type TdaPart = {
+export type TadPart = {
     id: string,
     partNumber: string,
     customerNumber?: string,
     location?: string,
     description: string,
-    taItemNum: string,
+    tadItemNum: string,
     qtyPerValve: number,
     qtyUsed: number,
     qtyInStock: number,
@@ -20,7 +20,7 @@ export type TdaPart = {
     deliveryWeeks: number,
 }
 
-export type Tda = {
+export type Tad = {
     id: string,
     plant: string,
     name: string,
@@ -31,7 +31,7 @@ export type Tda = {
     lastMaintenanceDate: string,
     nextMaintenanceDate: string,
     drawing: Drawing | null,
-    parts: TdaPart[],
+    parts: TadPart[],
 }
 
 /** A scheduled outage at a plant. Dates are "YYYY-MM-DD". */
@@ -159,8 +159,8 @@ export const db = {
         { plant: "Conemaugh Generating Station", start: "2027-01-11", end: "2027-01-29", type: "Maintenance", description: "Scrubber maintenance" },
     ] as Outage[],
 
-    /* TDA drawing image paths, keyed by plant name. Put the images in /public, e.g. "/tda/limerick.png" */
-    tdaDrawings: {} as Record<string, string>,
+    /* TAD drawing image paths, keyed by plant name. Put the images in /public, e.g. "/tad/limerick.png" */
+    tadDrawings: {} as Record<string, string>,
 
     tasks: [
         {
