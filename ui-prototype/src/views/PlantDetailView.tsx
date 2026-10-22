@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import db, { outageTypes, type Drawing, type Outage, type Plant, type Tad, type TadPart } from '../data/Data'
+import { outageTypes, type Drawing, type Outage, type OutageType, type Plant, type Tad, type TadPart } from '../data/Data'
 import { App } from "../components/Components"
 import { Modal, formStyles } from '../components/Modal'
 
@@ -62,6 +62,15 @@ function PlantDetailView({
     /* State that holds the selected sidebar section */
     const [section, setSection] = useState<Section>("Outages");
 
+    /* TAD to open when switching to Assets from an outage (null = none selected) */
+    const [focusTadId, setFocusTadId] = useState<string | null>(null);
+
+    /* Jumps from an outage to that TAD's page under Assets */
+    function openTad(id: string) {
+        setFocusTadId(id);
+        setSection("Assets");
+    }
+
     const sections: [Section, () => React.JSX.Element][] = [
         ["Outages", App.Icon.Calendar],
         ["Info", App.Icon.Company],
@@ -81,7 +90,7 @@ function PlantDetailView({
                 {sections.map(([name, Icon]) =>
                     <div key={name} className={`${section === name ? "border-b-4 border-brand-green" : ""} flex`}>
                         <Icon />
-                        <button className="app-tab-button" onClick={() => setSection(name)}>
+                        <button className="app-tab-button" onClick={() => { setFocusTadId(null); setSection(name) }}>
                             {name}
                         </button>
                     </div>
@@ -90,9 +99,15 @@ function PlantDetailView({
 
             {/* Right side: the selected section */}
             <div className="flex min-w-0 grow flex-col lg:px-6">
-                {section === "Outages" && <PlantOutages plant={plant} outages={outages} onAddOutage={onAddOutage} />}
+                {section === "Outages" && <PlantOutages
+                    plant={plant}
+                    outages={outages}
+                    tads={tads.filter(tad => tad.plant === plant.name)}
+                    onAddOutage={onAddOutage}
+                    onOpenTad={openTad} />}
                 {section === "Info" && <PlantInfo plant={plant} outages={outages} />}
                 {section === "Assets" && <PlantAssets
+                    initialSelectedId={focusTadId}
                     plant={plant}
                     tads={tads.filter(tad => tad.plant === plant.name)}
                     onAddTad={onAddTad}
@@ -104,20 +119,21 @@ function PlantDetailView({
 }
 
 /** ----------------------------------------------------------------------------------------------------------------
- * Upcoming outages for a plant, each with its description and Top Assembly Drawings, plus an "Add outage" button
+ * Upcoming outages for a plant, each with its description and the TADs it covers, plus an "Add outage" button
+ * @param tads This plant's TADs (the ones managed under Assets)
+ * @param onOpenTad Called with a TAD's id when it's clicked on an outage (opens it under Assets)
  */
-function PlantOutages({ plant, outages, onAddOutage }: {
+function PlantOutages({ plant, outages, tads, onAddOutage, onOpenTad }: {
     plant: Plant,
     outages: Outage[],
+    tads: Tad[],
     onAddOutage: (outage: Outage) => void,
+    onOpenTad: (id: string) => void,
 }): React.JSX.Element {
     const upcoming = upcomingOutages(plant, outages);
 
     /* Whether the Add outage popup is open */
     const [adding, setAdding] = useState(false);
-
-    /* The drawing open in the viewer popup (null = closed) */
-    const [viewing, setViewing] = useState<Drawing | null>(null);
 
     return <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -134,29 +150,40 @@ function PlantOutages({ plant, outages, onAddOutage }: {
             : <ul className="flex flex-col gap-4">
                 {upcoming.map((outage, index) =>
                     <li key={outage.id ?? `${outage.start}-${index}`}>
-                        <OutageCard outage={outage} onViewDrawing={setViewing} />
+                        <OutageCard outage={outage} tads={tads} onOpenTad={onOpenTad} />
                     </li>)}
             </ul>}
 
         {adding &&
             <AddOutageModal
                 plant={plant}
+                tads={tads}
                 onCreate={outage => { onAddOutage(outage); setAdding(false) }}
                 onClose={() => setAdding(false)} />}
 
-        {viewing &&
-            <DrawingViewer drawing={viewing} onClose={() => setViewing(null)} />}
     </div>
 }
 
+/** Colored dot for an outage type: red for Major, amber for Minor */
+function OutageTypeBadge({ type }: { type: OutageType }): React.JSX.Element {
+    return <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-sm font-semibold text-text">
+        <span className={`h-2 w-2 rounded-full ${type === "Major" ? "bg-red-500" : "bg-amber-400"}`} aria-hidden="true" />
+        {type}
+    </span>
+}
+
 /** ----------------------------------------------------------------------------------------------------------------
- * One outage: dates, type, description, and its Top Assembly Drawings
+ * One outage: dates, type, description, and the TADs it covers
  */
-function OutageCard({ outage, onViewDrawing }: {
+function OutageCard({ outage, tads, onOpenTad }: {
     outage: Outage,
-    onViewDrawing: (drawing: Drawing) => void,
+    tads: Tad[],
+    onOpenTad: (id: string) => void,
 }): React.JSX.Element {
-    const drawings = outage.drawings ?? [];
+    /* Look up the outage's TADs (any that were deleted under Assets are skipped) */
+    const outageTads = (outage.tadIds ?? [])
+        .map(id => tads.find(tad => tad.id === id))
+        .filter((tad): tad is Tad => Boolean(tad));
     const inProgress = outage.start <= todayString();
 
     return <article className="flex flex-col gap-4 rounded-lg border border-line bg-main-background-2 p-5">
@@ -171,10 +198,7 @@ function OutageCard({ outage, onViewDrawing }: {
                     {durationDays(outage.start, outage.end)} days{inProgress && " · in progress"}
                 </span>
             </div>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-sm font-semibold text-text">
-                <span className="h-2 w-2 rounded-full bg-red-500" aria-hidden="true" />
-                {outage.type}
-            </span>
+            <OutageTypeBadge type={outage.type} />
         </div>
 
         {/* Description */}
@@ -183,69 +207,65 @@ function OutageCard({ outage, onViewDrawing }: {
             <p className="whitespace-pre-line text-text">{outage.description}</p>
         </div>
 
-        {/* Top Assembly Drawings */}
+        {/* Top Assembly Drawings (TADs) */}
         <div className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">
-                Top Assembly Drawings ({drawings.length})
+                Top Assembly Drawings ({outageTads.length})
             </h3>
-            {drawings.length === 0
-                ? <p className="text-sm text-text-muted">No drawings attached.</p>
-                : <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-3">
-                    {drawings.map((drawing, index) =>
-                        <button key={drawing.url + index} onClick={() => onViewDrawing(drawing)}
-                            title={`View ${drawing.name}`}
+            {outageTads.length === 0
+                ? <p className="text-sm text-text-muted">No TADs selected for this outage.</p>
+                : <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
+                    {outageTads.map(tad =>
+                        <button key={tad.id}
+                            onClick={() => onOpenTad(tad.id)}
+                            title={`Open ${tad.name || "this TAD"} in Assets`}
                             className="group flex flex-col overflow-hidden rounded-lg border border-line bg-main-background text-left transition-colors hover:border-brand-green cursor-pointer">
-                            {isPdf(drawing)
-                                ? <span className="flex h-24 items-center justify-center text-2xl font-bold text-text-muted">PDF</span>
-                                : <img src={drawing.url} alt="" className="h-24 w-full bg-white object-contain" />}
-                            <span className="truncate border-t border-line px-2 py-1.5 text-xs text-text group-hover:text-brand-green">{drawing.name}</span>
+                            <TadThumbnail tad={tad} className="h-24" />
+                            <span className="flex flex-col border-t border-line px-2 py-1.5">
+                                <span className="truncate text-sm font-semibold text-text group-hover:text-brand-green">{tad.name || "Unnamed TAD"}</span>
+                                <span className="truncate text-xs text-text-muted">{tad.tagNumber || "No tag number"}</span>
+                            </span>
                         </button>)}
                 </div>}
         </div>
     </article>
 }
 
-/** ----------------------------------------------------------------------------------------------------------------
- * Popup showing one drawing large (images inline, PDFs embedded with an "open in new tab" link)
- */
-function DrawingViewer({ drawing, onClose }: { drawing: Drawing, onClose: () => void }): React.JSX.Element {
-    return <Modal title={drawing.name} onClose={onClose} wide footer={<>
-        <a href={drawing.url} target="_blank" rel="noreferrer" className={formStyles.ghostButton + " no-underline"}>Open in new tab</a>
-        <button className={formStyles.primaryButton} onClick={onClose}>Close</button>
-    </>}>
-        {isPdf(drawing)
-            ? <object data={drawing.url} type="application/pdf" className="h-[70vh] w-full rounded-lg bg-white">
-                <p className="text-text-muted">This browser can't preview PDFs here. Use "Open in new tab".</p>
-            </object>
-            : <img src={drawing.url} alt={`Top Assembly Drawing: ${drawing.name}`}
-                className="max-h-[70vh] w-full rounded-lg bg-white object-contain" />}
-    </Modal>
+/** A TAD's drawing preview: the image, a "PDF" tile, or "No drawing" when none has been uploaded */
+function TadThumbnail({ tad, className = "" }: { tad: Tad, className?: string }): React.JSX.Element {
+    if (!tad.drawing) {
+        return <span className={`flex items-center justify-center text-xs text-text-muted ${className}`}>No drawing</span>
+    }
+    if (isPdf(tad.drawing)) {
+        return <span className={`flex items-center justify-center text-xl font-bold text-text-muted ${className}`}>PDF</span>
+    }
+    return <img src={tad.drawing.url} alt="" className={`w-full bg-white object-contain ${className}`} />
 }
 
 /** ----------------------------------------------------------------------------------------------------------------
- * Popup form for a new outage: dates, type, description, and Top Assembly Drawings (upload images/PDFs,
- * and optionally attach the plant's own TAD drawing if one is on file).
+ * Popup form for a new outage: dates, Major/Minor, description, and which of the plant's existing TADs it covers
  */
-function AddOutageModal({ plant, onCreate, onClose }: {
+function AddOutageModal({ plant, tads, onCreate, onClose }: {
     plant: Plant,
+    tads: Tad[],
     onCreate: (outage: Outage) => void,
     onClose: () => void,
 }): React.JSX.Element {
-    const plantDrawing = db.tadDrawings[plant.name];
-
     const [start, setStart] = useState('');
     const [end, setEnd] = useState('');
-    const [type, setType] = useState(outageTypes[0]);
+    const [type, setType] = useState<OutageType>("Major");
     const [description, setDescription] = useState('');
-    const [files, setFiles] = useState<File[]>([]);
-    const [includePlantDrawing, setIncludePlantDrawing] = useState(Boolean(plantDrawing));
+    const [tadIds, setTadIds] = useState<string[]>([]);
+    const [tadSearch, setTadSearch] = useState('');
     const [error, setError] = useState('');
 
-    /* Adds files picked in the file input (skips duplicates by name) */
-    function addFiles(list: FileList | null) {
-        if (!list) return;
-        const picked = Array.from(list);
-        setFiles(current => [...current, ...picked.filter(file => !current.some(existing => existing.name === file.name))]);
+    /* TADs matching the search box (by name, tag number or status) */
+    const query = tadSearch.trim().toLowerCase();
+    const visibleTads = tads.filter(tad =>
+        !query || `${tad.name} ${tad.tagNumber} ${tad.installationStatus}`.toLowerCase().includes(query));
+
+    function toggleTad(id: string) {
+        setTadIds(current => current.includes(id) ? current.filter(existing => existing !== id) : [...current, id]);
     }
 
     function create(e: React.FormEvent) {
@@ -255,12 +275,6 @@ function AddOutageModal({ plant, onCreate, onClose }: {
         if (end < todayString()) return setError('That outage has already ended. Only upcoming outages are listed here.');
         if (!description.trim()) return setError('Add a description of the outage.');
 
-        /* Uploaded files get a temporary browser URL. Swap this for a real upload once there's a backend. */
-        const drawings: Drawing[] = [
-            ...(includePlantDrawing && plantDrawing ? [{ name: `${plant.name} TAD`, url: plantDrawing }] : []),
-            ...files.map(file => ({ name: file.name, url: URL.createObjectURL(file) })),
-        ];
-
         onCreate({
             id: `outage-${Date.now()}`,
             plant: plant.name,
@@ -268,7 +282,8 @@ function AddOutageModal({ plant, onCreate, onClose }: {
             end,
             type,
             description: description.trim(),
-            drawings,
+            /* Keep the TADs in the same order they're listed under Assets */
+            tadIds: tads.map(tad => tad.id).filter(id => tadIds.includes(id)),
         });
     }
 
@@ -279,8 +294,8 @@ function AddOutageModal({ plant, onCreate, onClose }: {
     </>}>
         <form id="add-outage-form" onSubmit={create} className="flex flex-col gap-4">
 
-            {/* Dates + type */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {/* Dates */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-1">
                     <label className={formStyles.label} htmlFor="outage-start">Start date</label>
                     <input id="outage-start" type="date" className={formStyles.input} value={start} autoFocus
@@ -291,56 +306,72 @@ function AddOutageModal({ plant, onCreate, onClose }: {
                     <input id="outage-end" type="date" className={formStyles.input} value={end} min={start || undefined}
                         onChange={e => setEnd(e.target.value)} />
                 </div>
-                <div className="flex flex-col gap-1">
-                    <label className={formStyles.label} htmlFor="outage-type">Type</label>
-                    <select id="outage-type" className={formStyles.input} value={type} onChange={e => setType(e.target.value)}>
-                        {outageTypes.map(option => <option key={option} value={option}>{option}</option>)}
-                    </select>
-                </div>
             </div>
             {start && end && end >= start &&
                 <p className="-mt-2 text-sm text-text-muted">{durationDays(start, end)} days</p>}
 
+            {/* Major / Minor */}
+            <fieldset className="flex flex-col gap-1">
+                <legend className={formStyles.label + " mb-1"}>Type</legend>
+                <div className="inline-flex w-fit rounded-lg border border-line bg-main-background p-1">
+                    {outageTypes.map(option =>
+                        <label key={option}
+                            className={`flex cursor-pointer items-center gap-2 rounded-md px-4 py-1.5 font-semibold transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-green
+                                ${type === option ? 'bg-brand-blue text-main-background' : 'text-text-muted hover:text-text'}`}>
+                            <input type="radio" name="outage-type" value={option} className="sr-only"
+                                checked={type === option} onChange={() => setType(option)} />
+                            {option}
+                        </label>)}
+                </div>
+            </fieldset>
+
             {/* Description */}
             <div className="flex flex-col gap-1">
                 <label className={formStyles.label} htmlFor="outage-description">Description</label>
-                <textarea id="outage-description" rows={5} className={formStyles.input + " resize-y"} value={description}
+                <textarea id="outage-description" rows={4} className={formStyles.input + " resize-y"} value={description}
                     onChange={e => setDescription(e.target.value)}
                     placeholder="What's being worked on, scope, affected units, contractors, notes..." />
             </div>
 
-            {/* Top Assembly Drawings */}
+            {/* Pick existing TADs */}
             <fieldset className="flex flex-col gap-2">
-                <legend className={formStyles.label + " mb-1"}>Top Assembly Drawings</legend>
+                <legend className={formStyles.label + " mb-1"}>
+                    Top Assembly Drawings <span className="text-text-muted">· {tadIds.length} of {tads.length} selected</span>
+                </legend>
 
-                {plantDrawing &&
-                    <label className="flex cursor-pointer items-center gap-3 text-text">
-                        <input type="checkbox" className={formStyles.checkbox} checked={includePlantDrawing}
-                            onChange={e => setIncludePlantDrawing(e.target.checked)} />
-                        Attach this plant's Top Assembly Drawing
-                    </label>}
+                {tads.length === 0
+                    ? <p className="rounded-lg border border-dashed border-line p-5 text-center text-sm text-text-muted">
+                        This plant doesn't have any TADs yet. Add them under <b>Assets</b>, then they'll show up here.
+                    </p>
+                    : <>
+                        {tads.length > 5 &&
+                            <>
+                                <label className="sr-only" htmlFor="outage-tad-search">Search TADs</label>
+                                <input id="outage-tad-search" type="search" placeholder="Search TADs by name or tag..."
+                                    value={tadSearch} onChange={e => setTadSearch(e.target.value)} className={formStyles.input} />
+                            </>}
 
-                <label htmlFor="outage-drawings"
-                    className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-line px-4 py-6 text-center transition-colors hover:border-brand-green">
-                    <span className="font-semibold text-brand-blue">Choose drawing files</span>
-                    <span className="text-sm text-text-muted">Images or PDFs · you can pick more than one</span>
-                </label>
-                <input id="outage-drawings" type="file" multiple accept="image/*,.pdf" className="sr-only"
-                    onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
-
-                {files.length > 0 &&
-                    <ul className="flex flex-col overflow-hidden rounded-lg border border-line">
-                        {files.map((file, index) =>
-                            <li key={file.name} className={`flex items-center gap-3 px-3 py-2 ${index > 0 ? 'border-t border-line' : ''}`}>
-                                <span className="min-w-0 flex-1 truncate text-sm text-text">{file.name}</span>
-                                <span className="shrink-0 text-xs text-text-muted">{Math.max(1, Math.round(file.size / 1024))} KB</span>
-                                <button type="button" aria-label={`Remove ${file.name}`}
-                                    onClick={() => setFiles(current => current.filter(f => f !== file))}
-                                    className="flex h-6 w-6 items-center justify-center rounded-md text-base leading-none text-text-muted hover:text-red-500 cursor-pointer">
-                                    ×
-                                </button>
-                            </li>)}
-                    </ul>}
+                        <ul className="flex max-h-72 flex-col overflow-y-auto rounded-lg border border-line">
+                            {visibleTads.map((tad, index) =>
+                                <li key={tad.id} className={index > 0 ? 'border-t border-line' : ''}>
+                                    <label className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-main-background">
+                                        <input type="checkbox" className={formStyles.checkbox}
+                                            checked={tadIds.includes(tad.id)} onChange={() => toggleTad(tad.id)} />
+                                        <span className="h-10 w-14 shrink-0 overflow-hidden rounded border border-line bg-main-background">
+                                            <TadThumbnail tad={tad} className="h-full" />
+                                        </span>
+                                        <span className="flex min-w-0 flex-1 flex-col">
+                                            <span className="truncate font-semibold text-text">{tad.name || "Unnamed TAD"}</span>
+                                            <span className="truncate text-xs text-text-muted">
+                                                {tad.tagNumber || "No tag number"} · {tad.installationStatus}
+                                            </span>
+                                        </span>
+                                    </label>
+                                </li>)}
+                            {visibleTads.length === 0 &&
+                                <li className="px-3 py-3 text-sm text-text-muted">No TADs match "{tadSearch}".</li>}
+                        </ul>
+                    </>}
             </fieldset>
         </form>
     </Modal>
@@ -375,14 +406,16 @@ function PlantInfo({ plant, outages }: { plant: Plant, outages: Outage[] }): Rea
 /** ----------------------------------------------------------------------------------------------------------------
  * A plant's Top Assembly Drawings and their editable parts lists
  */
-function PlantAssets({ plant, tads, onAddTad, onUpdateTad, onDeleteTad }: {
+function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdateTad, onDeleteTad }: {
     plant: Plant,
     tads: Tad[],
+    /* TAD to show when the page opens (e.g. one clicked on an outage) */
+    initialSelectedId?: string | null,
     onAddTad: (tad: Tad) => void,
     onUpdateTad: (tad: Tad) => void,
     onDeleteTad: (id: string) => void,
 }): React.JSX.Element {
-    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
     const [confirmingDelete, setConfirmingDelete] = useState(false);
     const [draftTad, setDraftTad] = useState<Tad | null>(null);
     const [isNewTad, setIsNewTad] = useState(false);
