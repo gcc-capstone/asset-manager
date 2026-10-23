@@ -49,7 +49,9 @@ function Home(): React.JSX.Element {
     outageReport ? db.plants.find(plant => plant.name === outageReport.plant) ?? null : null
   );
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedOutage, setSelectedOutage] = useState<Outage | null>(null);
   const [plantOpenedFromTask, setPlantOpenedFromTask] = useState(false);
+  const [plantOpenedFromCalendar, setPlantOpenedFromCalendar] = useState(false);
 
   /* TADs are prototype state so edits persist while navigating between plants. */
   const [tads, setTads] = useState<Tad[]>(() => seededTads);
@@ -64,18 +66,42 @@ function Home(): React.JSX.Element {
     setActiveTab(tab);
     setSelectedPlant(null);
     setSelectedTask(null);
+    setSelectedOutage(null);
     setPlantOpenedFromTask(false);
+    setPlantOpenedFromCalendar(false);
   }
 
   function openPlantFromTask(plant: Plant) {
     setSelectedPlant(plant);
+    setSelectedOutage(null);
     setPlantOpenedFromTask(true);
+    setPlantOpenedFromCalendar(false);
+    setActiveTab("Plants");
+  }
+
+  function openPlantFromOutage(outage: Outage) {
+    const plant = db.plants.find(candidate => candidate.name === outage.plant);
+    if (!plant) {
+      throw new Error(`Cannot open outage for unknown plant "${outage.plant}".`);
+    }
+    setSelectedPlant(plant);
+    setSelectedOutage(outage);
+    setPlantOpenedFromTask(false);
+    setPlantOpenedFromCalendar(true);
     setActiveTab("Plants");
   }
 
   function backToTasks() {
     setSelectedPlant(null);
     setPlantOpenedFromTask(false);
+    setPlantOpenedFromCalendar(false);
+    setActiveTab("Tasks");
+  }
+
+  function backToCalendar() {
+    setSelectedPlant(null);
+    setSelectedOutage(null);
+    setPlantOpenedFromCalendar(false);
     setActiveTab("Tasks");
   }
 
@@ -151,16 +177,20 @@ function Home(): React.JSX.Element {
         ? <PlantDetailView
           plant={selectedPlant}
           outages={outages}
+          focusOutage={selectedOutage}
           tads={tads}
           onAddOutage={outage => setOutages(current => [...current, { ...outage, id: outage.id ?? `outage-${Date.now()}` }])}
           onAddTad={tad => setTads(current => [...current, tad])}
           onUpdateTad={updated => setTads(current => current.map(tad => tad.id === updated.id ? updated : tad))}
           onDeleteTad={id => setTads(current => current.filter(tad => tad.id !== id))}
+          onBack={plantOpenedFromCalendar
+            ? backToCalendar
+            : plantOpenedFromTask ? backToTasks : () => setSelectedPlant(null)}
           onOpenReport={outage => openOutageReport(outage, selectedPlant)}
           submittedReportIds={submittedReportIds}
           onReportSubmitted={markReportSubmitted}
-          onBack={plantOpenedFromTask ? backToTasks : () => setSelectedPlant(null)}
           backToTasks={plantOpenedFromTask}
+          backToCalendar={plantOpenedFromCalendar}
         />
         : <div className="px-6 py-4">
           <PlantsView onSelect={setSelectedPlant} />
@@ -185,6 +215,8 @@ function Home(): React.JSX.Element {
           selectedTask={selectedTask}
           onTaskSelect={setSelectedTask}
           onPlantSelect={openPlantFromTask}
+          outages={outages}
+          onOutageSelect={openPlantFromOutage}
         />
       </div>
       : null}
