@@ -189,7 +189,6 @@ function Home(): React.JSX.Element {
           onOpenReport={outage => openOutageReport(outage, selectedPlant)}
           submittedReportIds={submittedReportIds}
           onReportSubmitted={markReportSubmitted}
-          onBack={plantOpenedFromTask ? backToTasks : () => setSelectedPlant(null)}
           backToTasks={plantOpenedFromTask}
           backToCalendar={plantOpenedFromCalendar}
         />

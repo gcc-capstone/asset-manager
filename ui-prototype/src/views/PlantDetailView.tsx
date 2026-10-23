@@ -140,8 +140,17 @@ function PlantDetailView({
  * @param tads This plant's TADs (the ones managed under Assets)
  * @param onOpenTad Called with a TAD's id when it's clicked on an outage (opens it under Assets)
  */
-function PlantOutages({ plant, outages, focusOutage, tads, onAddOutage, onOpenTad }: {
-function PlantOutages({ plant, outages, tads, onAddOutage, onOpenTad, onOpenReport, submittedReportIds, onReportSubmitted }: {
+function PlantOutages({
+    plant,
+    outages,
+    focusOutage,
+    tads,
+    onAddOutage,
+    onOpenTad,
+    onOpenReport,
+    submittedReportIds,
+    onReportSubmitted,
+}: {
     plant: Plant,
     outages: Outage[],
     focusOutage: Outage | null,
@@ -182,15 +191,12 @@ function PlantOutages({ plant, outages, tads, onAddOutage, onOpenTad, onOpenRepo
             : <ul className="flex flex-col gap-4">
                 {displayedOutages.map((outage, index) =>
                     <li key={outage.id ?? `${outage.plant}-${outage.start}-${outage.end}-${index}`}>
-                {upcoming.map((outage, index) =>
-                    <li key={outage.id ?? `${outage.start}-${index}`}>
                         <OutageCard
                             outage={outage}
                             tads={tads}
                             onOpenTad={onOpenTad}
                             isFocused={outage === focusOutage}
                             onFocusElement={outage === focusOutage ? setFocusedOutageElement : undefined}
-                        />
                             onOpenReport={onOpenReport}
                             reportSubmitted={submittedReportIds.has(outage.id ?? `${outage.plant}-${outage.start}`)}
                             onReportSubmitted={() => onReportSubmitted(outage)} />
@@ -218,19 +224,24 @@ function OutageTypeBadge({ type }: { type: OutageType }): React.JSX.Element {
 /** ----------------------------------------------------------------------------------------------------------------
  * One outage: dates, type, description, and the TADs it covers
  */
-function OutageCard({ outage, tads, onOpenTad, isFocused = false, onFocusElement }: {
-    outage: Outage,
-    tads: Tad[],
-    onOpenTad: (id: string) => void,
-    isFocused?: boolean,
-    onFocusElement?: (element: HTMLElement | null) => void,
-function OutageCard({ outage, tads, onOpenTad, onOpenReport, reportSubmitted, onReportSubmitted }: {
+function OutageCard({
+    outage,
+    tads,
+    onOpenTad,
+    onOpenReport,
+    reportSubmitted,
+    onReportSubmitted,
+    isFocused = false,
+    onFocusElement,
+}: {
     outage: Outage,
     tads: Tad[],
     onOpenTad: (id: string) => void,
     onOpenReport: (outage: Outage) => void,
     reportSubmitted: boolean,
     onReportSubmitted: () => void,
+    isFocused?: boolean,
+    onFocusElement?: (element: HTMLElement | null) => void,
 }): React.JSX.Element {
     /* Look up the outage's TADs (any that were deleted under Assets are skipped) */
     const linkedTads = (outage.tadIds ?? [])
