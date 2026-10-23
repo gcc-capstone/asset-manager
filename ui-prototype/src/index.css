@@ -97,11 +97,7 @@ h1,h2,h3,.logo-text {
     padding-bottom: 0.25rem;
   }
 
-  .app-shell-search {
-    display: none;
-  }
-
-  .app-account-button {
+  .app-shell-actions {
     position: absolute;
     top: 0.6rem;
     right: 1rem;

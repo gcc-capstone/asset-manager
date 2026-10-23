@@ -50,6 +50,7 @@ function PlantDetailView({
     onReportSubmitted,
     onBack,
     backToTasks = false,
+    initialTadId = null,
 }: {
     plant: Plant,
     outages: Outage[],
@@ -63,13 +64,15 @@ function PlantDetailView({
     onReportSubmitted: (outage: Outage) => void,
     onBack: () => void,
     backToTasks?: boolean,
+    /* Open the page on Assets with this TAD selected (e.g. a TAD or part picked from the header search) */
+    initialTadId?: string | null,
 }): React.JSX.Element {
 
     /* State that holds the selected sidebar section */
-    const [section, setSection] = useState<Section>("Outages");
+    const [section, setSection] = useState<Section>(initialTadId ? "Assets" : "Outages");
 
-    /* TAD to open when switching to Assets from an outage (null = none selected) */
-    const [focusTadId, setFocusTadId] = useState<string | null>(null);
+    /* TAD to open when switching to Assets from an outage or search (null = none selected) */
+    const [focusTadId, setFocusTadId] = useState<string | null>(initialTadId);
 
     /* Jumps from an outage to that TAD's page under Assets */
     function openTad(id: string) {
@@ -85,10 +88,17 @@ function PlantDetailView({
 
     return <div className="flex flex-col w-full">
 
-        {/* Top: back link and plant name, above the sidebar */}
-        <App.Subtitle text={backToTasks ? "← Back to tasks" : "← All plants"} onClick={onBack}/>
-        <App.Title text={plant.name} />
-        <div className="border-b-2 border-brand-blue mb-6" />
+        {/* Top: small back link, then the plant name and county, above the sidebar */}
+        <div className="mb-6 flex flex-col gap-1 border-b border-line pb-4">
+            <button type="button" onClick={onBack}
+                className="w-fit text-sm text-text-muted transition-colors hover:text-brand-green cursor-pointer">
+                {backToTasks ? "← Back to tasks" : "← All plants"}
+            </button>
+            <h1 className="text-2xl text-text">
+                {plant.name}{" "}
+                <span className="ml-2 text-base font-normal text-text-muted">{plant.county} County</span>
+            </h1>
+        </div>
 
         <div className="flex flex-col gap-6 lg:flex-row lg:gap-0">
             {/* Left side: sections for this plant (same styling as the main sidebar) */}
@@ -149,7 +159,7 @@ function PlantOutages({ plant, outages, tads, onAddOutage, onOpenTad, onOpenRepo
 
     return <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-2xl text-brand-blue">
+            <h2 className="text-xl text-text">
                 Upcoming Outages <span className="text-base font-normal text-text-muted">{upcoming.length}</span>
             </h2>
             <button className={formStyles.primaryButton} onClick={() => setAdding(true)}>+ Add outage</button>
@@ -214,7 +224,7 @@ function OutageCard({ outage, tads, onOpenTad, onOpenReport, reportSubmitted, on
         {/* Dates and type */}
         <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex flex-col">
-                <span className="text-lg font-bold text-brand-blue" style={{ fontFamily: "var(--font-display)" }}>
+                <span className="text-lg font-bold text-text" style={{ fontFamily: "var(--font-display)" }}>
                     {formatDate(outage.start)} – {formatDate(outage.end)}
                 </span>
                 <span className="text-sm text-text-muted">
@@ -225,40 +235,35 @@ function OutageCard({ outage, tads, onOpenTad, onOpenReport, reportSubmitted, on
         </div>
 
         {/* Description */}
-        <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Description</h3>
-            <p className="whitespace-pre-line text-text">{outage.description}</p>
-        </div>
+        <p className="whitespace-pre-line text-text">{outage.description}</p>
 
-        {/* Top Assembly Drawings (TADs) */}
-        <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-text-muted">
-                Top Assembly Drawings ({outageTads.length})
-            </h3>
+        {/* Top Assembly Drawings (TADs) as small chips; clicking one opens it under Assets */}
+        <div className="flex flex-wrap items-center gap-2" aria-label="Top Assembly Drawings">
+            <span className="text-sm text-text-muted">TADs</span>
             {outageTads.length === 0
-                ? <p className="text-sm text-text-muted">No TADs selected for this outage.</p>
-                : <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
-                    {outageTads.map(tad =>
-                        <button key={tad.id}
-                            onClick={() => onOpenTad(tad.id)}
-                            title={`Open ${tad.name || "this TAD"} in Assets`}
-                            className="group flex flex-col overflow-hidden rounded-lg border border-line bg-main-background text-left transition-colors hover:border-brand-green cursor-pointer">
-                            <TadThumbnail tad={tad} className="h-24" />
-                            <span className="flex flex-col border-t border-line px-2 py-1.5">
-                                <span className="truncate text-sm font-semibold text-text group-hover:text-brand-green">{tad.name || "Unnamed TAD"}</span>
-                                <span className="truncate text-xs text-text-muted">{tad.tagNumber || "No tag number"}</span>
-                            </span>
-                        </button>)}
-                </div>}
+                ? <span className="text-sm text-text-muted">· none selected</span>
+                : outageTads.map(tad =>
+                    <button key={tad.id}
+                        onClick={() => onOpenTad(tad.id)}
+                        title={`Open ${tad.name || "this TAD"} in Assets`}
+                        className="group inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-main-background px-3 py-1 text-sm transition-colors hover:border-brand-green cursor-pointer">
+                        <svg className="h-4 w-4 shrink-0 text-text-muted group-hover:text-brand-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" />
+                        </svg>
+                        <span className="shrink-0 font-semibold text-text group-hover:text-brand-green">{tad.tagNumber || tad.name || "Unnamed TAD"}</span>
+                        {tad.tagNumber && tad.drawing &&
+                            <span className="truncate text-text-muted">{tad.drawing.name.replace(/\.pdf$/i, "")}</span>}
+                    </button>)}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
+        {/* Service report actions (secondary, so "+ Add outage" stays the main action on the page) */}
+        <div className="flex flex-wrap items-center gap-2">
             {reportSubmitted
-                ? <button type="button" className={formStyles.primaryButton} onClick={() => onOpenReport(outage)}>
+                ? <button type="button" className={formStyles.ghostButton} onClick={() => onOpenReport(outage)}>
                     View report
                 </button>
                 : <>
-                    <label htmlFor={pdfInputId} className={`${formStyles.primaryButton} cursor-pointer`}>
+                    <label htmlFor={pdfInputId} className={`${formStyles.ghostButton} cursor-pointer`}>
                         Submit service report PDF
                     </label>
                     <input id={pdfInputId} type="file" accept=".pdf,application/pdf" className="sr-only"
@@ -354,7 +359,7 @@ function InventorySection({ tads, selectedTadId, disabled, onSelectTad, onAddPar
     return <section className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-2">
             <div>
-                <h3 className="text-xl font-semibold text-brand-blue">Inventory</h3>
+                <h3 className="text-xl font-semibold text-text">Inventory</h3>
                 <p className="mt-1 text-sm text-text-muted">{inventory.length} item{inventory.length === 1 ? "" : "s"} linked to this plant's TADs</p>
             </div>
             <button className={formStyles.primaryButton} onClick={() => setAdding(value => !value)}
@@ -430,7 +435,7 @@ function InventorySection({ tads, selectedTadId, disabled, onSelectTad, onAddPar
                         {inventory.map(({ tad, part }) =>
                             <Fragment key={`${tad.id}-${part.id}`}>
                                 <tr className="border-b border-line last:border-0">
-                                    <td className="whitespace-nowrap px-3 py-2 font-semibold text-brand-blue">{part.partNumber || "—"}</td>
+                                    <td className="whitespace-nowrap px-3 py-2 font-semibold text-text">{part.partNumber || "—"}</td>
                                     <td className="min-w-48 px-3 py-2">{part.description || "—"}</td>
                                     <td className="min-w-48 px-3 py-2">
                                         <button className="text-left font-semibold text-brand-blue underline decoration-brand-green underline-offset-2 hover:text-brand-green"
@@ -689,7 +694,7 @@ function PlantInfo({ plant, outages }: { plant: Plant, outages: Outage[] }): Rea
     ];
 
     return <div className="flex flex-col gap-4">
-        <App.Subtitle text="Plant Info" />
+        <h2 className="text-xl text-text">Plant Info</h2>
         <dl className="grid grid-cols-[auto_1fr] gap-x-10 gap-y-3">
             {rows.map(([label, value]) =>
                 <Fragment key={label}>
@@ -861,18 +866,10 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
     }
 
     return <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h2 className="text-3xl font-semibold text-brand-blue">Installed</h2>
-                <p className="mt-1 text-sm text-text-muted">Installed assets and their associated inventory</p>
-            </div>
-        </div>
-        <div className="border-b-2 border-brand-blue" />
-
         <section className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-2">
                 <div>
-                    <h3 className="text-xl font-semibold text-brand-blue">Top Assembly Drawing</h3>
+                    <h3 className="text-xl font-semibold text-text">Top Assembly Drawings</h3>
                     <p className="mt-1 text-sm text-text-muted">{tads.length} drawing{tads.length === 1 ? "" : "s"} for this plant</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -902,7 +899,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                                 setSelectedId(tad.id);
                             }}
                                 className={`flex w-full flex-col gap-1 rounded-lg border p-4 text-left transition-colors ${selectedId === tad.id ? "border-brand-green bg-main-background-2" : "border-line hover:border-brand-blue"}`}>
-                                <span className="font-semibold text-brand-blue">{tad.name || "Unnamed TAD"}</span>
+                                <span className={`font-semibold ${selectedId === tad.id ? "text-brand-blue" : "text-text"}`}>{tad.name || "Unnamed TAD"}</span>
                                 <span className="text-sm text-text-muted">{tad.tagNumber || "No tag number"} · {tad.installationStatus}</span>
                             </button>
                         </li>)}
@@ -962,7 +959,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
 
                         {editorTab === "Parts Info" && <section className="flex flex-col gap-3">
                             <div className="flex items-center justify-between gap-3">
-                                <h3 className="font-semibold text-brand-blue">Parts list</h3>
+                                <h3 className="font-semibold text-text">Parts list</h3>
                                 <button className={formStyles.ghostButton} onClick={addPart} disabled={!isEditing}>+ Add part</button>
                             </div>
                             <label className="flex cursor-pointer items-center gap-2 text-sm text-text">
@@ -1022,7 +1019,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                         </section>}
 
                         {editorTab === "Image Upload" && <section className="flex flex-col gap-3">
-                            <h3 className="font-semibold text-brand-blue">TAD drawing</h3>
+                            <h3 className="font-semibold text-text">TAD drawing</h3>
                             <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-line px-4 py-5 text-center transition-colors hover:border-brand-green">
                                 <span className="font-semibold text-brand-blue">{selectedTad.drawing ? "Replace drawing" : "Choose a drawing"}</span>
                                 <span className="text-sm text-text-muted">Image or PDF files</span>
@@ -1053,7 +1050,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                             <section>
                                 <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                                     <div>
-                                        <h3 className="text-xl font-semibold text-brand-blue">{selectedTad.name || "Unnamed TAD"}</h3>
+                                        <h3 className="text-xl font-semibold text-text">{selectedTad.name || "Unnamed TAD"}</h3>
                                         <p className="text-sm text-text-muted">{selectedTad.tagNumber || "No tag number"}</p>
                                     </div>
                                     <div className="flex flex-wrap gap-2 text-xs font-semibold">
@@ -1075,7 +1072,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                             </section>
                             <section className="flex flex-col gap-3 border-t border-line pt-4">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <h4 className="font-semibold text-brand-blue">Inventory linked to this drawing ({selectedTad.parts.length})</h4>
+                                    <h4 className="font-semibold text-text">Inventory linked to this drawing ({selectedTad.parts.length})</h4>
                                     <button className={formStyles.ghostButton} onClick={editTadInventory}>Edit inventory</button>
                                 </div>
                                 {selectedTad.parts.length === 0
@@ -1091,7 +1088,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                                             <tbody>
                                                 {selectedTad.parts.map(part =>
                                                     <tr key={part.id} className="border-b border-line last:border-0">
-                                                        <td className="whitespace-nowrap px-3 py-2 font-semibold text-brand-blue">{part.partNumber || "—"}</td>
+                                                        <td className="whitespace-nowrap px-3 py-2 font-semibold text-text">{part.partNumber || "—"}</td>
                                                         <td className="min-w-48 px-3 py-2">{part.description || "—"}</td>
                                                         <td className="whitespace-nowrap px-3 py-2">{part.location || "—"}</td>
                                                         <td className="px-3 py-2 text-right tabular-nums">{part.qtyPerValve}</td>
@@ -1104,7 +1101,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                                     </div>}
                             </section>
                             {selectedTad.drawing && <section className="flex flex-col gap-2 border-t border-line pt-4">
-                                <h3 className="font-semibold text-brand-blue">Drawing</h3>
+                                <h3 className="font-semibold text-text">Drawing</h3>
                                 <TadDrawingAttachment drawing={selectedTad.drawing}
                                     alt={`TAD drawing for ${selectedTad.name}`} />
                             </section>}

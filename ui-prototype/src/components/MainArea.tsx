@@ -8,10 +8,12 @@ import { MagnifyingGlass, User } from "./Icons"
  */
 type MainAreaProps = React.PropsWithChildren<{
     activeTab?: string,
-    onTabSelect?: (tab: string) => void
+    onTabSelect?: (tab: string) => void,
+    /* Search box to show in the header (falls back to a plain text field) */
+    search?: React.ReactNode
 }>
 
-export function MainArea({ children, activeTab, onTabSelect }: MainAreaProps): React.JSX.Element {
+export function MainArea({ children, activeTab, onTabSelect, search }: MainAreaProps): React.JSX.Element {
 
     /* The account button opens the Settings page */
     const settingsOpen = activeTab === "Settings";
@@ -39,23 +41,27 @@ export function MainArea({ children, activeTab, onTabSelect }: MainAreaProps): R
                 </nav>
             </div>
 
-            <div className="app-shell-search">
-                <TextField placeholder="Search..." width="25em">
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <MagnifyingGlass />
-                    </div>
-                </TextField>
-            </div>
+            {/* Right side: search (an icon that expands) and the account button */}
+            <div className="app-shell-actions flex items-center gap-2">
+                <div className="app-shell-search">
+                    {search ??
+                        <TextField placeholder="Search..." width="25em">
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <MagnifyingGlass />
+                            </div>
+                        </TextField>}
+                </div>
 
-            {/* Account button: icon only, opens Settings */}
-            <button
-                className={`app-account-button group ${settingsOpen ? "app-account-button-active" : ""}`}
-                aria-label="Account settings"
-                aria-current={settingsOpen ? "page" : undefined}
-                title="Account settings"
-                onClick={() => onTabSelect?.("Settings")}>
-                <User />
-            </button>
+                {/* Account button: icon only, opens Settings */}
+                <button
+                    className={`app-account-button group ${settingsOpen ? "app-account-button-active" : ""}`}
+                    aria-label="Account settings"
+                    aria-current={settingsOpen ? "page" : undefined}
+                    title="Account settings"
+                    onClick={() => onTabSelect?.("Settings")}>
+                    <User />
+                </button>
+            </div>
         </header >
         <main className="main-container flex">
             {children}
