@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import CalendarView from "./CalendarView"
-import db, { dateOffsetFromToday, replaceTasks, type Task, type Plant } from "../data/Data"
+import db, { dateOffsetFromToday, replaceTasks, type Outage, type Task, type Plant } from "../data/Data"
 import { App } from "../components/Components";
 
 /**
@@ -35,11 +35,11 @@ function TaskList({
 }): React.JSX.Element {
 
     return <section className="flex shrink-0 flex-col">
-        <div className="mb-3 flex items-center justify-between border-b-2 border-brand-blue">
+        <div className="mb-2 flex items-center justify-between border-b-2 border-brand-blue pb-1">
             <h2 className="text-xl font-bold text-brand-blue">{title}</h2>
             <span className="app-label-text">{tasks.length}</span>
         </div>
-        <div className="flex flex-col gap-3 pr-1">
+        <div className="flex flex-col gap-2 pr-1">
             {tasks.length === 0
                 ? <p className="app-label-text">{emptyMessage}</p>
                 : tasks.map((task) =>
@@ -50,8 +50,8 @@ function TaskList({
                                 {formatDate(task.dueDate)}
                             </span>
                         </div>
-                        <p className="mt-1 text-sm text-text-muted">{task.plant}</p>
-                        <p className="mt-2 text-xs text-text-muted">{task.category}</p>
+                        <p className="mt-0.5 text-sm text-text-muted">{task.plant}</p>
+                        <p className="mt-1 text-xs text-text-muted">{task.category}</p>
                     </button>
                 )}
         </div>
@@ -263,10 +263,14 @@ function TasksView({
     selectedTask,
     onTaskSelect,
     onPlantSelect,
+    outages,
+    onOutageSelect,
 }: {
     selectedTask: Task | null,
     onTaskSelect: (task: Task | null) => void,
     onPlantSelect: (plant: Plant) => void,
+    outages: Outage[],
+    onOutageSelect: (outage: Outage) => void,
 }): React.JSX.Element {
 
     const [tasks, setTasks] = useState<Task[]>(db.tasks);
@@ -328,7 +332,7 @@ function TasksView({
     }
 
     return <div className="grid min-h-[32rem] w-full grid-cols-2 items-start gap-30">
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-3">
             <button
                 type="button"
                 onClick={addTask}
@@ -356,7 +360,11 @@ function TasksView({
                     onTaskUpdate={updateTask}
                     onTaskDiscard={discardNewTask}
                     onPlantSelect={onPlantSelect} />
-                : <CalendarView onTaskClick={onTaskSelect} />}
+                : <CalendarView
+                    outages={outages}
+                    onTaskClick={onTaskSelect}
+                    onOutageClick={onOutageSelect}
+                />}
         </div>
     </div>
 }
