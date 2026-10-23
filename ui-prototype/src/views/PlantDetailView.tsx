@@ -45,6 +45,9 @@ function PlantDetailView({
     onAddTad,
     onUpdateTad,
     onDeleteTad,
+    onOpenReport,
+    submittedReportIds,
+    onReportSubmitted,
     onBack,
     backToTasks = false,
 }: {
@@ -55,6 +58,9 @@ function PlantDetailView({
     onAddTad: (tad: Tad) => void,
     onUpdateTad: (tad: Tad) => void,
     onDeleteTad: (id: string) => void,
+    onOpenReport: (outage: Outage) => void,
+    submittedReportIds: Set<string>,
+    onReportSubmitted: (outage: Outage) => void,
     onBack: () => void,
     backToTasks?: boolean,
 }): React.JSX.Element {
@@ -104,7 +110,10 @@ function PlantDetailView({
                     outages={outages}
                     tads={tads.filter(tad => tad.plant === plant.name)}
                     onAddOutage={onAddOutage}
-                    onOpenTad={openTad} />}
+                    onOpenTad={openTad}
+                    onOpenReport={onOpenReport}
+                    submittedReportIds={submittedReportIds}
+                    onReportSubmitted={onReportSubmitted} />}
                 {section === "Info" && <PlantInfo plant={plant} outages={outages} />}
                 {section === "Assets" && <PlantAssets
                     initialSelectedId={focusTadId}
@@ -123,12 +132,15 @@ function PlantDetailView({
  * @param tads This plant's TADs (the ones managed under Assets)
  * @param onOpenTad Called with a TAD's id when it's clicked on an outage (opens it under Assets)
  */
-function PlantOutages({ plant, outages, tads, onAddOutage, onOpenTad }: {
+function PlantOutages({ plant, outages, tads, onAddOutage, onOpenTad, onOpenReport, submittedReportIds, onReportSubmitted }: {
     plant: Plant,
     outages: Outage[],
     tads: Tad[],
     onAddOutage: (outage: Outage) => void,
     onOpenTad: (id: string) => void,
+    onOpenReport: (outage: Outage) => void,
+    submittedReportIds: Set<string>,
+    onReportSubmitted: (outage: Outage) => void,
 }): React.JSX.Element {
     const upcoming = upcomingOutages(plant, outages);
 
@@ -150,7 +162,13 @@ function PlantOutages({ plant, outages, tads, onAddOutage, onOpenTad }: {
             : <ul className="flex flex-col gap-4">
                 {upcoming.map((outage, index) =>
                     <li key={outage.id ?? `${outage.start}-${index}`}>
-                        <OutageCard outage={outage} tads={tads} onOpenTad={onOpenTad} />
+                        <OutageCard
+                            outage={outage}
+                            tads={tads}
+                            onOpenTad={onOpenTad}
+                            onOpenReport={onOpenReport}
+                            reportSubmitted={submittedReportIds.has(outage.id ?? `${outage.plant}-${outage.start}`)}
+                            onReportSubmitted={() => onReportSubmitted(outage)} />
                     </li>)}
             </ul>}
 
@@ -175,16 +193,21 @@ function OutageTypeBadge({ type }: { type: OutageType }): React.JSX.Element {
 /** ----------------------------------------------------------------------------------------------------------------
  * One outage: dates, type, description, and the TADs it covers
  */
-function OutageCard({ outage, tads, onOpenTad }: {
+function OutageCard({ outage, tads, onOpenTad, onOpenReport, reportSubmitted, onReportSubmitted }: {
     outage: Outage,
     tads: Tad[],
     onOpenTad: (id: string) => void,
+    onOpenReport: (outage: Outage) => void,
+    reportSubmitted: boolean,
+    onReportSubmitted: () => void,
 }): React.JSX.Element {
     /* Look up the outage's TADs (any that were deleted under Assets are skipped) */
-    const outageTads = (outage.tadIds ?? [])
+    const linkedTads = (outage.tadIds ?? [])
         .map(id => tads.find(tad => tad.id === id))
         .filter((tad): tad is Tad => Boolean(tad));
+    const outageTads = linkedTads.length > 0 ? linkedTads : tads.slice(0, 1);
     const inProgress = outage.start <= todayString();
+    const pdfInputId = `outage-pdf-${outage.id ?? outage.start}`
 
     return <article className="flex flex-col gap-4 rounded-lg border border-line bg-main-background-2 p-5">
 
@@ -227,6 +250,27 @@ function OutageCard({ outage, tads, onOpenTad }: {
                             </span>
                         </button>)}
                 </div>}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
+            {reportSubmitted
+                ? <button type="button" className={formStyles.primaryButton} onClick={() => onOpenReport(outage)}>
+                    View report
+                </button>
+                : <>
+                    <label htmlFor={pdfInputId} className={`${formStyles.primaryButton} cursor-pointer`}>
+                        Submit service report PDF
+                    </label>
+                    <input id={pdfInputId} type="file" accept=".pdf,application/pdf" className="sr-only"
+                        onChange={event => {
+                            const file = event.target.files?.[0]
+                            if (file) onReportSubmitted()
+                            event.target.value = ""
+                        }} />
+                    <button type="button" onClick={() => onOpenReport(outage)} className={formStyles.ghostButton}>
+                        Open DO1 service report
+                    </button>
+                </>}
         </div>
     </article>
 }
@@ -507,7 +551,7 @@ function AddOutageModal({ plant, tads, onCreate, onClose }: {
     const [end, setEnd] = useState('');
     const [type, setType] = useState<OutageType>("Major");
     const [description, setDescription] = useState('');
-    const [tadIds, setTadIds] = useState<string[]>([]);
+    const [tadIds, setTadIds] = useState<string[]>(() => tads[0] ? [tads[0].id] : []);
     const [tadSearch, setTadSearch] = useState('');
     const [error, setError] = useState('');
 
@@ -526,6 +570,8 @@ function AddOutageModal({ plant, tads, onCreate, onClose }: {
         if (end < start) return setError('The end date must be on or after the start date.');
         if (end < todayString()) return setError('That outage has already ended. Only upcoming outages are listed here.');
         if (!description.trim()) return setError('Add a description of the outage.');
+        const selectedTadIds = tads.map(tad => tad.id).filter(id => tadIds.includes(id));
+        if (selectedTadIds.length === 0) return setError('Select at least one TAD for every outage.');
 
         onCreate({
             id: `outage-${Date.now()}`,
@@ -535,7 +581,7 @@ function AddOutageModal({ plant, tads, onCreate, onClose }: {
             type,
             description: description.trim(),
             /* Keep the TADs in the same order they're listed under Assets */
-            tadIds: tads.map(tad => tad.id).filter(id => tadIds.includes(id)),
+            tadIds: selectedTadIds,
         });
     }
 
@@ -588,12 +634,12 @@ function AddOutageModal({ plant, tads, onCreate, onClose }: {
             {/* Pick existing TADs */}
             <fieldset className="flex flex-col gap-2">
                 <legend className={formStyles.label + " mb-1"}>
-                    Top Assembly Drawings <span className="text-text-muted">· {tadIds.length} of {tads.length} selected</span>
+                    Top Assembly Drawings <span className="text-text-muted">· {tadIds.filter(id => tads.some(tad => tad.id === id)).length} of {tads.length} selected · select at least one</span>
                 </legend>
 
                 {tads.length === 0
                     ? <p className="rounded-lg border border-dashed border-line p-5 text-center text-sm text-text-muted">
-                        This plant doesn't have any TADs yet. Add them under <b>Assets</b>, then they'll show up here.
+                        This plant doesn't have any TADs yet. Add at least one under <b>Assets</b> before scheduling an outage.
                     </p>
                     : <>
                         {tads.length > 5 &&
