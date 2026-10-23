@@ -1,4 +1,13 @@
 
+import drawing2043631 from "./RE__TDA_drawings/204363-1-FK_B.pdf?url"
+import drawing2043632 from "./RE__TDA_drawings/204363-2-TA_B.pdf?url"
+import drawing2043633 from "./RE__TDA_drawings/204363-3-FK_B.pdf?url"
+import drawing2043634 from "./RE__TDA_drawings/204363-4-TA_B.pdf?url"
+import drawing2043635 from "./RE__TDA_drawings/204363-5-FK_B.pdf?url"
+import drawing2043636 from "./RE__TDA_drawings/204363-6-TA_B.pdf?url"
+import drawing8002891 from "./RE__TDA_drawings/800289-1_D.pdf?url"
+import drawing8002894 from "./RE__TDA_drawings/800289-4_C.pdf?url"
+
 /** A Top Assembly Drawing (TAD) file. `url` is an image or PDF path (e.g. "/tad/limerick-u1.png") or an uploaded file's URL. */
 export type Drawing = {
     name: string,
@@ -162,9 +171,6 @@ export const db = {
         { plant: "Conemaugh Generating Station", start: "2027-01-11", end: "2027-01-29", type: "Minor", description: "Scrubber maintenance" },
     ] as Outage[],
 
-    /* TAD drawing image paths, keyed by plant name. Put the images in /public, e.g. "/tad/limerick.png" */
-    tadDrawings: {} as Record<string, string>,
-
     tasks: [
         {
             title: "Review inspection report",
@@ -226,6 +232,99 @@ export const db = {
         },
     ] as Task[]
 }
+
+const suppliedDrawings: Drawing[] = [
+    { name: "204363-1-FK_B.pdf", url: drawing2043631 },
+    { name: "204363-2-TA_B.pdf", url: drawing2043632 },
+    { name: "204363-3-FK_B.pdf", url: drawing2043633 },
+    { name: "204363-4-TA_B.pdf", url: drawing2043634 },
+    { name: "204363-5-FK_B.pdf", url: drawing2043635 },
+    { name: "204363-6-TA_B.pdf", url: drawing2043636 },
+    { name: "800289-1_D.pdf", url: drawing8002891 },
+    { name: "800289-4_C.pdf", url: drawing8002894 },
+]
+
+const dummyPartCatalog: Omit<TadPart, "id">[] = [
+    {
+        partNumber: "GSK-204363",
+        customerNumber: "BU-11042",
+        location: "Upper bonnet",
+        description: "Spiral-wound bonnet gasket",
+        tadItemNum: "1",
+        qtyPerValve: 1,
+        qtyUsed: 2,
+        qtyInStock: 1,
+        qtyNeeded: 2,
+        qtyToBuy: 1,
+        deliveryWeeks: 4,
+    },
+    {
+        partNumber: "STEM-800289",
+        customerNumber: "BU-23817",
+        location: "Drive assembly",
+        description: "Stainless steel valve stem",
+        tadItemNum: "2",
+        qtyPerValve: 1,
+        qtyUsed: 1,
+        qtyInStock: 2,
+        qtyNeeded: 1,
+        qtyToBuy: 0,
+        deliveryWeeks: 8,
+    },
+    {
+        partNumber: "PACK-67120",
+        customerNumber: "BU-09436",
+        location: "Packing gland",
+        description: "Graphite packing set",
+        tadItemNum: "3",
+        qtyPerValve: 5,
+        qtyUsed: 10,
+        qtyInStock: 5,
+        qtyNeeded: 10,
+        qtyToBuy: 5,
+        deliveryWeeks: 3,
+    },
+    {
+        partNumber: "SEAT-44018",
+        customerNumber: "BU-32106",
+        location: "Valve body",
+        description: "Hard-faced replacement seat",
+        tadItemNum: "4",
+        qtyPerValve: 1,
+        qtyUsed: 0,
+        qtyInStock: 1,
+        qtyNeeded: 1,
+        qtyToBuy: 0,
+        deliveryWeeks: 12,
+    },
+]
+
+/** Seeded prototype TADs; supplied drawings are reused to cover every plant. */
+export const seededTads: Tad[] = db.plants.flatMap((plant, plantIndex) => {
+    const drawingCount = plantIndex < 10 ? 2 : 1
+
+    return Array.from({ length: drawingCount }, (_, drawingIndex) => {
+        const drawing = suppliedDrawings[(plantIndex * 3 + drawingIndex * 4) % suppliedDrawings.length]
+        const id = `seed-tad-${plantIndex + 1}-${drawingIndex + 1}`
+
+        return {
+            id,
+            plant: plant.name,
+            name: `${plant.name} - ${drawing.name.replace(/\.pdf$/i, "")}`,
+            tagNumber: `TAD-${String(plantIndex + 1).padStart(2, "0")}-${drawingIndex + 1}`,
+            installationStatus: ["Installed", "Spare", "Not installed", "Removed"][plantIndex % 4] as Tad["installationStatus"],
+            operationalStatus: ["Active", "Active", "Inactive", "Unknown"][plantIndex % 4] as Tad["operationalStatus"],
+            installDate: `${2016 + plantIndex % 7}-${String(1 + plantIndex % 12).padStart(2, "0")}-15`,
+            lastMaintenanceDate: `202${plantIndex % 5}-${String(1 + (plantIndex + drawingIndex) % 12).padStart(2, "0")}-10`,
+            nextMaintenanceDate: `2027-${String(1 + (plantIndex + drawingIndex) % 12).padStart(2, "0")}-20`,
+            drawing: { ...drawing },
+            parts: [0, 1].map((partIndex) => {
+                const part = dummyPartCatalog[(plantIndex + drawingIndex + partIndex) % dummyPartCatalog.length]
+                return { ...part, id: `${id}-part-${partIndex + 1}` }
+            }),
+        }
+    })
+})
 
 export function replaceTasks(tasks: Task[]): void {
     db.tasks = tasks;

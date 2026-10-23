@@ -275,6 +275,7 @@ function TasksView({
 
     const [tasks, setTasks] = useState<Task[]>(db.tasks);
     const [newTask, setNewTask] = useState<Task | null>(null);
+    const [taskCreated, setTaskCreated] = useState(false);
     const today: string = dateOffsetFromToday(0);
 
     const upcomingTasks: Task[] = tasks
@@ -288,6 +289,7 @@ function TasksView({
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
     function addTask() {
+        setTaskCreated(false);
         const plant = db.plants[0];
         if (!plant) {
             throw new Error("Cannot create a task because there are no plants available.");
@@ -319,6 +321,7 @@ function TasksView({
         replaceTasks(nextTasks);
         setTasks(nextTasks);
         if (newTask === selectedTask) {
+            setTaskCreated(true);
             setNewTask(null);
         }
         onTaskSelect(updatedTask);
@@ -340,6 +343,7 @@ function TasksView({
             >
                 Add task
             </button>
+            {taskCreated && <p className="text-sm font-semibold text-brand-green" role="status">Task created successfully.</p>}
             <TaskList title="Upcoming Tasks" tasks={upcomingTasks} onTaskClick={onTaskSelect} />
             <TaskList title="Overdue Tasks" tasks={overdueTasks} overdue onTaskClick={onTaskSelect} />
             <TaskList

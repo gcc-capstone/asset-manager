@@ -150,9 +150,9 @@ function AdminView(): React.JSX.Element {
     const [roleError, setRoleError] = useState('')
 
     /* ----- Which popup is open ----- */
-    const [popup, setPopup] = useState<null | 'roles' | 'plants' | 'newAccount'>(null)
+    const [popup, setPopup] = useState<null | 'roles' | 'plants' | 'newAccount' | 'editAccount'>(null)
 
-    /* ----- New account popup fields ----- */
+    /* ----- Account popup fields ----- */
     const [newName, setNewName] = useState('')
     const [newEmail, setNewEmail] = useState('')
     const [newRoles, setNewRoles] = useState<string[]>([])
@@ -202,14 +202,32 @@ function AdminView(): React.JSX.Element {
 
         if (!name) return setAccountError('Enter a name.')
         if (!/^\S+@\S+\.\S+$/.test(email)) return setAccountError('Enter a valid email address.')
-        if (accounts.some(account => account.email.toLowerCase() === email)) return setAccountError('An account with that email already exists.')
+        if (accounts.some(account => account.email.toLowerCase() === email && account.id !== selected?.id)) return setAccountError('An account with that email already exists.')
         if (newRoles.length === 0) return setAccountError('Pick at least one role.')
+
+        if (popup === 'editAccount') {
+            if (!selected) return setAccountError('Select an account to edit.')
+            setAccounts(current => current.map(account => account.id === selected.id
+                ? { ...account, name, email, roles: newRoles }
+                : account))
+            setPopup(null)
+            return
+        }
 
         const account: Account = { id: `acct-${Date.now()}`, name, email, roles: newRoles, plants: [] }
         setAccounts(current => [...current, account])
         setSearch('')
         selectAccount(account.id)
         setPopup(null)
+    }
+
+    function openEditAccount() {
+        if (!selected) return
+        setNewName(selected.name)
+        setNewEmail(selected.email)
+        setNewRoles(selected.roles)
+        setAccountError('')
+        setPopup('editAccount')
     }
 
     function deleteSelectedAccount() {
@@ -351,17 +369,20 @@ function AdminView(): React.JSX.Element {
                         <span className="text-text-muted">{selected.email}</span>
                     </div>
 
-                    {/* Delete account (asks to confirm first) */}
-                    {confirmingDelete
-                        ? <div className="flex items-center gap-2" role="alert">
-                            <span className="text-sm text-text">Delete this account?</span>
-                            <button onClick={deleteSelectedAccount}
-                                className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-red-700 cursor-pointer">
-                                Delete
-                            </button>
-                            <button onClick={() => setConfirmingDelete(false)} className={ghostButtonClass}>Cancel</button>
-                        </div>
-                        : <button onClick={() => setConfirmingDelete(true)} className={dangerButtonClass}>Delete account</button>}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <button onClick={openEditAccount} className={ghostButtonClass}>Edit account</button>
+                        {/* Delete account (asks to confirm first) */}
+                        {confirmingDelete
+                            ? <div className="flex items-center gap-2" role="alert">
+                                <span className="text-sm text-text">Delete this account?</span>
+                                <button onClick={deleteSelectedAccount}
+                                    className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-red-700 cursor-pointer">
+                                    Delete
+                                </button>
+                                <button onClick={() => setConfirmingDelete(false)} className={ghostButtonClass}>Cancel</button>
+                            </div>
+                            : <button onClick={() => setConfirmingDelete(true)} className={dangerButtonClass}>Delete account</button>}
+                    </div>
                 </div>
 
                 {/* Roles on this account */}
@@ -423,10 +444,10 @@ function AdminView(): React.JSX.Element {
                 onSave={values => updateSelected(account => ({ ...account, plants: values }))}
                 onClose={() => setPopup(null)} />}
 
-        {popup === 'newAccount' &&
-            <Modal title="New account" onClose={() => setPopup(null)} footer={<>
+        {(popup === 'newAccount' || popup === 'editAccount') &&
+            <Modal title={popup === 'editAccount' ? 'Edit account' : 'New account'} onClose={() => setPopup(null)} footer={<>
                 <button className={ghostButtonClass} onClick={() => setPopup(null)}>Cancel</button>
-                <button className={primaryButtonClass} type="submit" form="new-account-form">Create account</button>
+                <button className={primaryButtonClass} type="submit" form="new-account-form">{popup === 'editAccount' ? 'Save changes' : 'Create account'}</button>
             </>}>
                 <form id="new-account-form" onSubmit={createAccount} className="flex flex-col gap-3">
                     <div className="flex flex-col gap-1">
