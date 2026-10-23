@@ -45,6 +45,9 @@ function PlantDetailView({
     onAddTad,
     onUpdateTad,
     onDeleteTad,
+    onOpenReport,
+    submittedReportIds,
+    onReportSubmitted,
     onBack,
     backToTasks = false,
 }: {
@@ -55,6 +58,9 @@ function PlantDetailView({
     onAddTad: (tad: Tad) => void,
     onUpdateTad: (tad: Tad) => void,
     onDeleteTad: (id: string) => void,
+    onOpenReport: (outage: Outage) => void,
+    submittedReportIds: Set<string>,
+    onReportSubmitted: (outage: Outage) => void,
     onBack: () => void,
     backToTasks?: boolean,
 }): React.JSX.Element {
@@ -104,7 +110,10 @@ function PlantDetailView({
                     outages={outages}
                     tads={tads.filter(tad => tad.plant === plant.name)}
                     onAddOutage={onAddOutage}
-                    onOpenTad={openTad} />}
+                    onOpenTad={openTad}
+                    onOpenReport={onOpenReport}
+                    submittedReportIds={submittedReportIds}
+                    onReportSubmitted={onReportSubmitted} />}
                 {section === "Info" && <PlantInfo plant={plant} outages={outages} />}
                 {section === "Assets" && <PlantAssets
                     initialSelectedId={focusTadId}
@@ -123,12 +132,15 @@ function PlantDetailView({
  * @param tads This plant's TADs (the ones managed under Assets)
  * @param onOpenTad Called with a TAD's id when it's clicked on an outage (opens it under Assets)
  */
-function PlantOutages({ plant, outages, tads, onAddOutage, onOpenTad }: {
+function PlantOutages({ plant, outages, tads, onAddOutage, onOpenTad, onOpenReport, submittedReportIds, onReportSubmitted }: {
     plant: Plant,
     outages: Outage[],
     tads: Tad[],
     onAddOutage: (outage: Outage) => void,
     onOpenTad: (id: string) => void,
+    onOpenReport: (outage: Outage) => void,
+    submittedReportIds: Set<string>,
+    onReportSubmitted: (outage: Outage) => void,
 }): React.JSX.Element {
     const upcoming = upcomingOutages(plant, outages);
 
@@ -150,7 +162,13 @@ function PlantOutages({ plant, outages, tads, onAddOutage, onOpenTad }: {
             : <ul className="flex flex-col gap-4">
                 {upcoming.map((outage, index) =>
                     <li key={outage.id ?? `${outage.start}-${index}`}>
-                        <OutageCard outage={outage} tads={tads} onOpenTad={onOpenTad} />
+                        <OutageCard
+                            outage={outage}
+                            tads={tads}
+                            onOpenTad={onOpenTad}
+                            onOpenReport={onOpenReport}
+                            reportSubmitted={submittedReportIds.has(outage.id ?? `${outage.plant}-${outage.start}`)}
+                            onReportSubmitted={() => onReportSubmitted(outage)} />
                     </li>)}
             </ul>}
 
@@ -175,16 +193,21 @@ function OutageTypeBadge({ type }: { type: OutageType }): React.JSX.Element {
 /** ----------------------------------------------------------------------------------------------------------------
  * One outage: dates, type, description, and the TADs it covers
  */
-function OutageCard({ outage, tads, onOpenTad }: {
+function OutageCard({ outage, tads, onOpenTad, onOpenReport, reportSubmitted, onReportSubmitted }: {
     outage: Outage,
     tads: Tad[],
     onOpenTad: (id: string) => void,
+    onOpenReport: (outage: Outage) => void,
+    reportSubmitted: boolean,
+    onReportSubmitted: () => void,
 }): React.JSX.Element {
     /* Look up the outage's TADs (any that were deleted under Assets are skipped) */
-    const outageTads = (outage.tadIds ?? [])
+    const linkedTads = (outage.tadIds ?? [])
         .map(id => tads.find(tad => tad.id === id))
         .filter((tad): tad is Tad => Boolean(tad));
+    const outageTads = linkedTads.length > 0 ? linkedTads : tads.slice(0, 1);
     const inProgress = outage.start <= todayString();
+    const pdfInputId = `outage-pdf-${outage.id ?? outage.start}`
 
     return <article className="flex flex-col gap-4 rounded-lg border border-line bg-main-background-2 p-5">
 
@@ -228,7 +251,263 @@ function OutageCard({ outage, tads, onOpenTad }: {
                         </button>)}
                 </div>}
         </div>
+
+        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
+            {reportSubmitted
+                ? <button type="button" className={formStyles.primaryButton} onClick={() => onOpenReport(outage)}>
+                    View report
+                </button>
+                : <>
+                    <label htmlFor={pdfInputId} className={`${formStyles.primaryButton} cursor-pointer`}>
+                        Submit service report PDF
+                    </label>
+                    <input id={pdfInputId} type="file" accept=".pdf,application/pdf" className="sr-only"
+                        onChange={event => {
+                            const file = event.target.files?.[0]
+                            if (file) onReportSubmitted()
+                            event.target.value = ""
+                        }} />
+                    <button type="button" onClick={() => onOpenReport(outage)} className={formStyles.ghostButton}>
+                        Open DO1 service report
+                    </button>
+                </>}
+        </div>
     </article>
+}
+
+function InventorySection({ tads, selectedTadId, disabled, onSelectTad, onAddPart, onUpdatePart, onDeletePart }: {
+    tads: Tad[],
+    selectedTadId: string,
+    disabled: boolean,
+    onSelectTad: (id: string) => void,
+    onAddPart: (tadId: string, part: TadPart) => void,
+    onUpdatePart: (tadId: string, part: TadPart) => void,
+    onDeletePart: (tadId: string, partId: string) => void,
+}): React.JSX.Element {
+    const [adding, setAdding] = useState(false)
+    const [editing, setEditing] = useState<{ tadId: string, part: TadPart } | null>(null)
+    const [targetTadId, setTargetTadId] = useState(selectedTadId || tads[0]?.id || "")
+    const [partNumber, setPartNumber] = useState("")
+    const [customerNumber, setCustomerNumber] = useState("")
+    const [description, setDescription] = useState("")
+    const [location, setLocation] = useState("")
+    const [tadItemNum, setTadItemNum] = useState("")
+    const [qtyPerValve, setQtyPerValve] = useState(1)
+    const [qtyInStock, setQtyInStock] = useState(0)
+    const [qtyNeeded, setQtyNeeded] = useState(1)
+    const [deliveryWeeks, setDeliveryWeeks] = useState(0)
+    const inventory = tads.flatMap(tad => tad.parts.map(part => ({ tad, part })))
+
+    useEffect(() => {
+        if (selectedTadId && tads.some(tad => tad.id === selectedTadId)) {
+            setTargetTadId(selectedTadId)
+        }
+    }, [selectedTadId, tads])
+
+    function addInventoryItem(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault()
+        if (disabled) return
+        if (!tads.some(tad => tad.id === targetTadId)) {
+            throw new Error("Select a valid TAD before adding inventory.")
+        }
+
+        onAddPart(targetTadId, {
+            id: `part-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            partNumber: partNumber.trim(),
+            customerNumber: customerNumber.trim(),
+            location: location.trim(),
+            description: description.trim(),
+            tadItemNum: tadItemNum.trim(),
+            qtyPerValve,
+            qtyUsed: 0,
+            qtyInStock,
+            qtyNeeded,
+            qtyToBuy: Math.max(0, qtyNeeded - qtyInStock),
+            deliveryWeeks,
+        })
+        setPartNumber("")
+        setCustomerNumber("")
+        setDescription("")
+        setLocation("")
+        setTadItemNum("")
+        setQtyPerValve(1)
+        setQtyInStock(0)
+        setQtyNeeded(1)
+        setDeliveryWeeks(0)
+        setAdding(false)
+    }
+
+    function updateEditingPart(patch: Partial<TadPart>) {
+        setEditing(current => current ? { ...current, part: { ...current.part, ...patch } } : current)
+    }
+
+    function saveInventoryItem(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault()
+        if (!editing || disabled) return
+        onUpdatePart(editing.tadId, {
+            ...editing.part,
+            qtyToBuy: Math.max(0, editing.part.qtyNeeded - editing.part.qtyInStock),
+        })
+        setEditing(null)
+    }
+
+    return <section className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-2">
+            <div>
+                <h3 className="text-xl font-semibold text-brand-blue">Inventory</h3>
+                <p className="mt-1 text-sm text-text-muted">{inventory.length} item{inventory.length === 1 ? "" : "s"} linked to this plant's TADs</p>
+            </div>
+            <button className={formStyles.primaryButton} onClick={() => setAdding(value => !value)}
+                disabled={disabled || tads.length === 0}>
+                {adding ? "Cancel" : "+ Add inventory"}
+            </button>
+        </div>
+
+        {adding && <form onSubmit={addInventoryItem} className="grid grid-cols-1 gap-3 rounded-lg border border-line bg-main-background-2 p-4 sm:grid-cols-2 xl:grid-cols-3">
+            <label className="flex flex-col gap-1 sm:col-span-2 xl:col-span-3">
+                <span className={formStyles.label}>Link to Top Assembly Drawing</span>
+                <select className={formStyles.input} value={targetTadId} onChange={event => setTargetTadId(event.target.value)} required>
+                    {tads.map(tad =>
+                        <option key={tad.id} value={tad.id}>{tad.name} · {tad.tagNumber || "No tag number"}</option>)}
+                </select>
+            </label>
+            <label className="flex flex-col gap-1">
+                <span className={formStyles.label}>Part number</span>
+                <input className={formStyles.input} value={partNumber} onChange={event => setPartNumber(event.target.value)} required />
+            </label>
+            <label className="flex flex-col gap-1">
+                <span className={formStyles.label}>Customer number</span>
+                <input className={formStyles.input} value={customerNumber} onChange={event => setCustomerNumber(event.target.value)} />
+            </label>
+            <label className="flex flex-col gap-1">
+                <span className={formStyles.label}>TAD item number</span>
+                <input className={formStyles.input} value={tadItemNum} onChange={event => setTadItemNum(event.target.value)} />
+            </label>
+            <label className="flex flex-col gap-1 sm:col-span-2 xl:col-span-3">
+                <span className={formStyles.label}>Description</span>
+                <input className={formStyles.input} value={description} onChange={event => setDescription(event.target.value)} required />
+            </label>
+            <label className="flex flex-col gap-1">
+                <span className={formStyles.label}>Warehouse location</span>
+                <input className={formStyles.input} value={location} onChange={event => setLocation(event.target.value)} />
+            </label>
+            <label className="flex flex-col gap-1">
+                <span className={formStyles.label}>Quantity per assembly</span>
+                <input type="number" min="0" step="1" className={formStyles.input} value={qtyPerValve}
+                    onChange={event => setQtyPerValve(Number(event.target.value))} required />
+            </label>
+            <label className="flex flex-col gap-1">
+                <span className={formStyles.label}>In stock</span>
+                <input type="number" min="0" step="1" className={formStyles.input} value={qtyInStock}
+                    onChange={event => setQtyInStock(Number(event.target.value))} required />
+            </label>
+            <label className="flex flex-col gap-1">
+                <span className={formStyles.label}>Quantity needed</span>
+                <input type="number" min="0" step="1" className={formStyles.input} value={qtyNeeded}
+                    onChange={event => setQtyNeeded(Number(event.target.value))} required />
+            </label>
+            <label className="flex flex-col gap-1">
+                <span className={formStyles.label}>Delivery time (weeks)</span>
+                <input type="number" min="0" step="1" className={formStyles.input} value={deliveryWeeks}
+                    onChange={event => setDeliveryWeeks(Number(event.target.value))} required />
+            </label>
+            <div className="flex items-end sm:col-span-2 xl:col-span-3">
+                <button type="submit" className={formStyles.primaryButton}>Save inventory item</button>
+            </div>
+        </form>}
+
+        {inventory.length === 0
+            ? <p className="rounded-lg border border-dashed border-line p-6 text-center text-sm text-text-muted">
+                No inventory recorded. Add an item and link it to one of this plant's Top Assembly Drawings.
+            </p>
+            : <div className="overflow-x-auto rounded-lg border border-line">
+                <table className="w-full border-collapse text-sm">
+                    <thead><tr className="bg-main-background text-left text-text-muted">
+                        {["Part #", "Description", "Top Assembly Drawing", "Location", "Qty / assembly", "In stock", "Needed", "To buy", "Delivery (weeks)", "Actions"].map(label =>
+                            <th key={label} className="whitespace-nowrap border-b border-line px-3 py-2 font-semibold">{label}</th>)}
+                    </tr></thead>
+                    <tbody>
+                        {inventory.map(({ tad, part }) =>
+                            <Fragment key={`${tad.id}-${part.id}`}>
+                                <tr className="border-b border-line last:border-0">
+                                    <td className="whitespace-nowrap px-3 py-2 font-semibold text-brand-blue">{part.partNumber || "—"}</td>
+                                    <td className="min-w-48 px-3 py-2">{part.description || "—"}</td>
+                                    <td className="min-w-48 px-3 py-2">
+                                        <button className="text-left font-semibold text-brand-blue underline decoration-brand-green underline-offset-2 hover:text-brand-green"
+                                            disabled={disabled}
+                                            onClick={() => onSelectTad(tad.id)}>
+                                            {tad.drawing?.name ?? tad.name}
+                                        </button>
+                                        <span className="block text-xs text-text-muted">{tad.tagNumber || "No tag number"}</span>
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2">{part.location || "—"}</td>
+                                    <td className="px-3 py-2 text-right tabular-nums">{part.qtyPerValve}</td>
+                                    <td className="px-3 py-2 text-right tabular-nums">{part.qtyInStock}</td>
+                                    <td className="px-3 py-2 text-right tabular-nums">{part.qtyNeeded}</td>
+                                    <td className={`px-3 py-2 text-right tabular-nums ${part.qtyToBuy > 0 ? "font-bold text-red-500" : ""}`}>{part.qtyToBuy}</td>
+                                    <td className="px-3 py-2 text-right tabular-nums">{part.deliveryWeeks}</td>
+                                    <td className="whitespace-nowrap px-3 py-2">
+                                        <div className="flex gap-2">
+                                            <button className={formStyles.ghostButton} disabled={disabled}
+                                                onClick={() => setEditing({ tadId: tad.id, part: { ...part } })}>Edit</button>
+                                            <button className="font-semibold text-red-500 hover:underline" disabled={disabled}
+                                                onClick={() => onDeletePart(tad.id, part.id)}>Remove</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {editing?.tadId === tad.id && editing.part.id === part.id &&
+                                    <tr className="border-b border-line bg-main-background-2">
+                                        <td colSpan={10} className="p-3">
+                                            <form onSubmit={saveInventoryItem} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                                <label className="flex flex-col gap-1">
+                                                    <span className={formStyles.label}>Part number</span>
+                                                    <input className={formStyles.input} value={editing.part.partNumber}
+                                                        onChange={event => updateEditingPart({ partNumber: event.target.value })} required />
+                                                </label>
+                                                <label className="flex flex-col gap-1">
+                                                    <span className={formStyles.label}>Customer number</span>
+                                                    <input className={formStyles.input} value={editing.part.customerNumber ?? ""}
+                                                        onChange={event => updateEditingPart({ customerNumber: event.target.value })} />
+                                                </label>
+                                                <label className="flex flex-col gap-1">
+                                                    <span className={formStyles.label}>Description</span>
+                                                    <input className={formStyles.input} value={editing.part.description}
+                                                        onChange={event => updateEditingPart({ description: event.target.value })} required />
+                                                </label>
+                                                <label className="flex flex-col gap-1">
+                                                    <span className={formStyles.label}>Location</span>
+                                                    <input className={formStyles.input} value={editing.part.location ?? ""}
+                                                        onChange={event => updateEditingPart({ location: event.target.value })} />
+                                                </label>
+                                                <label className="flex flex-col gap-1">
+                                                    <span className={formStyles.label}>TAD item number</span>
+                                                    <input className={formStyles.input} value={editing.part.tadItemNum}
+                                                        onChange={event => updateEditingPart({ tadItemNum: event.target.value })} />
+                                                </label>
+                                                {([
+                                                    ["Quantity per assembly", "qtyPerValve"],
+                                                    ["Quantity used", "qtyUsed"],
+                                                    ["In stock", "qtyInStock"],
+                                                    ["Quantity needed", "qtyNeeded"],
+                                                    ["Delivery time (weeks)", "deliveryWeeks"],
+                                                ] as const).map(([label, field]) =>
+                                                    <label key={field} className="flex flex-col gap-1">
+                                                        <span className={formStyles.label}>{label}</span>
+                                                        <input type="number" min="0" step="1" className={formStyles.input} value={editing.part[field]}
+                                                            onChange={event => updateEditingPart({ [field]: Number(event.target.value) })} required />
+                                                    </label>)}
+                                                <div className="flex items-end gap-2 sm:col-span-2 xl:col-span-4">
+                                                    <button type="submit" className={formStyles.primaryButton}>Save changes</button>
+                                                    <button type="button" className={formStyles.ghostButton} onClick={() => setEditing(null)}>Cancel</button>
+                                                </div>
+                                            </form>
+                                        </td>
+                                    </tr>}
+                            </Fragment>)}
+                    </tbody>
+                </table>
+            </div>}
+    </section>
 }
 
 /** A TAD's drawing preview: the image, a "PDF" tile, or "No drawing" when none has been uploaded */
@@ -237,9 +516,26 @@ function TadThumbnail({ tad, className = "" }: { tad: Tad, className?: string })
         return <span className={`flex items-center justify-center text-xs text-text-muted ${className}`}>No drawing</span>
     }
     if (isPdf(tad.drawing)) {
-        return <span className={`flex items-center justify-center text-xl font-bold text-text-muted ${className}`}>PDF</span>
+        return <span title={tad.drawing.name} className={`flex flex-col items-center justify-center overflow-hidden px-1 text-center text-xs text-text-muted ${className}`}>
+            <span className="font-bold">PDF</span>
+            <span className="w-full truncate">{tad.drawing.name}</span>
+        </span>
     }
     return <img src={tad.drawing.url} alt="" className={`w-full bg-white object-contain ${className}`} />
+}
+
+/** A drawing attachment that opens PDFs directly and previews image drawings inline. */
+function TadDrawingAttachment({ drawing, alt }: { drawing: Drawing, alt: string }): React.JSX.Element {
+    if (isPdf(drawing)) {
+        return <a href={drawing.url} target="_blank" rel="noreferrer"
+            className="flex max-w-full flex-col items-start gap-1 rounded-lg border border-line bg-main-background-2 p-4 text-left hover:border-brand-green">
+            <span className="font-semibold text-brand-blue">PDF drawing</span>
+            <span className="break-all text-sm text-text-muted">{drawing.name}</span>
+            <span className="text-sm font-semibold text-brand-green">Open PDF in new tab ↗</span>
+        </a>
+    }
+    return <img src={drawing.url} alt={alt}
+        className="max-h-96 max-w-full self-start rounded-lg border border-line bg-white object-contain" />
 }
 
 /** ----------------------------------------------------------------------------------------------------------------
@@ -255,7 +551,7 @@ function AddOutageModal({ plant, tads, onCreate, onClose }: {
     const [end, setEnd] = useState('');
     const [type, setType] = useState<OutageType>("Major");
     const [description, setDescription] = useState('');
-    const [tadIds, setTadIds] = useState<string[]>([]);
+    const [tadIds, setTadIds] = useState<string[]>(() => tads[0] ? [tads[0].id] : []);
     const [tadSearch, setTadSearch] = useState('');
     const [error, setError] = useState('');
 
@@ -274,6 +570,8 @@ function AddOutageModal({ plant, tads, onCreate, onClose }: {
         if (end < start) return setError('The end date must be on or after the start date.');
         if (end < todayString()) return setError('That outage has already ended. Only upcoming outages are listed here.');
         if (!description.trim()) return setError('Add a description of the outage.');
+        const selectedTadIds = tads.map(tad => tad.id).filter(id => tadIds.includes(id));
+        if (selectedTadIds.length === 0) return setError('Select at least one TAD for every outage.');
 
         onCreate({
             id: `outage-${Date.now()}`,
@@ -283,7 +581,7 @@ function AddOutageModal({ plant, tads, onCreate, onClose }: {
             type,
             description: description.trim(),
             /* Keep the TADs in the same order they're listed under Assets */
-            tadIds: tads.map(tad => tad.id).filter(id => tadIds.includes(id)),
+            tadIds: selectedTadIds,
         });
     }
 
@@ -336,12 +634,12 @@ function AddOutageModal({ plant, tads, onCreate, onClose }: {
             {/* Pick existing TADs */}
             <fieldset className="flex flex-col gap-2">
                 <legend className={formStyles.label + " mb-1"}>
-                    Top Assembly Drawings <span className="text-text-muted">· {tadIds.length} of {tads.length} selected</span>
+                    Top Assembly Drawings <span className="text-text-muted">· {tadIds.filter(id => tads.some(tad => tad.id === id)).length} of {tads.length} selected · select at least one</span>
                 </legend>
 
                 {tads.length === 0
                     ? <p className="rounded-lg border border-dashed border-line p-5 text-center text-sm text-text-muted">
-                        This plant doesn't have any TADs yet. Add them under <b>Assets</b>, then they'll show up here.
+                        This plant doesn't have any TADs yet. Add at least one under <b>Assets</b> before scheduling an outage.
                     </p>
                     : <>
                         {tads.length > 5 &&
@@ -404,7 +702,7 @@ function PlantInfo({ plant, outages }: { plant: Plant, outages: Outage[] }): Rea
 }
 
 /** ----------------------------------------------------------------------------------------------------------------
- * A plant's Top Assembly Drawings and their editable parts lists
+ * A plant's installed assets, Top Assembly Drawings, and linked inventory
  */
 function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdateTad, onDeleteTad }: {
     plant: Plant,
@@ -511,6 +809,14 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
         setEditorTab("General Info");
     }
 
+    function editTadInventory() {
+        if (!selectedTad) return;
+        setDraftTad({ ...selectedTad, parts: selectedTad.parts.map(part => ({ ...part })) });
+        setIsNewTad(false);
+        setIsEditing(true);
+        setEditorTab("Parts Info");
+    }
+
     function confirmTad() {
         if (!selectedTad || !isEditing) return;
 
@@ -554,20 +860,28 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
         setConfirmingDelete(false);
     }
 
-    return <div className="flex flex-col gap-5">
+    return <div className="flex flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <h2 className="text-2xl text-brand-blue">Top Assembly Drawings</h2>
-                <p className="mt-1 text-sm text-text-muted">{tads.length} TAD{tads.length === 1 ? "" : "s"} for this plant</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-                <button className={formStyles.ghostButton} disabled title="Excel export will be available once the spreadsheet format is defined.">
-                    Export to Excel
-                </button>
-                <button className={formStyles.primaryButton} onClick={addTad} disabled={isEditing}>+ Add TAD</button>
+                <h2 className="text-3xl font-semibold text-brand-blue">Installed</h2>
+                <p className="mt-1 text-sm text-text-muted">Installed assets and their associated inventory</p>
             </div>
         </div>
+        <div className="border-b-2 border-brand-blue" />
 
+        <section className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-2">
+                <div>
+                    <h3 className="text-xl font-semibold text-brand-blue">Top Assembly Drawing</h3>
+                    <p className="mt-1 text-sm text-text-muted">{tads.length} drawing{tads.length === 1 ? "" : "s"} for this plant</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <button className={formStyles.ghostButton} disabled title="Excel export will be available once the spreadsheet format is defined.">
+                        Export to Excel
+                    </button>
+                    <button className={formStyles.primaryButton} onClick={addTad} disabled={isEditing}>+ Add TAD</button>
+                </div>
+            </div>
         {visibleTads.length === 0
             ? <p className="rounded-lg border border-dashed border-line p-8 text-center text-text-muted">
                 No TADs on file for this plant. Add one to record its details and parts.
@@ -708,17 +1022,17 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                         </section>}
 
                         {editorTab === "Image Upload" && <section className="flex flex-col gap-3">
-                            <h3 className="font-semibold text-brand-blue">TAD picture</h3>
+                            <h3 className="font-semibold text-brand-blue">TAD drawing</h3>
                             <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-line px-4 py-5 text-center transition-colors hover:border-brand-green">
-                                <span className="font-semibold text-brand-blue">{selectedTad.drawing ? "Replace drawing" : "Choose a picture"}</span>
-                                <span className="text-sm text-text-muted">Image files</span>
-                                <input type="file" accept="image/*" className="sr-only"
+                                <span className="font-semibold text-brand-blue">{selectedTad.drawing ? "Replace drawing" : "Choose a drawing"}</span>
+                                <span className="text-sm text-text-muted">Image or PDF files</span>
+                                <input type="file" accept="image/*,.pdf,application/pdf" className="sr-only"
                                     onChange={e => { setDrawing(e.target.files?.[0]); e.target.value = "" }} />
                             </label>
                             {selectedTad.drawing &&
                                 <div className="flex flex-col gap-2">
-                                    <img src={selectedTad.drawing.url} alt={`TAD drawing for ${selectedTad.name}`}
-                                        className="max-h-96 max-w-full self-start rounded-lg border-2 border-brand-blue bg-white object-contain" />
+                                    <TadDrawingAttachment drawing={selectedTad.drawing}
+                                        alt={`TAD drawing for ${selectedTad.name}`} />
                                     <button className={`${formStyles.ghostButton} self-start`}
                                         onClick={() => {
                                             if (selectedTad.drawing?.url.startsWith("blob:")) URL.revokeObjectURL(selectedTad.drawing.url);
@@ -761,36 +1075,29 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                             </section>
                             <section className="flex flex-col gap-3 border-t border-line pt-4">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <h3 className="font-semibold text-brand-blue">Parts ({selectedTad.parts.length})</h3>
-                                    {selectedTad.parts.some(part => part.location) &&
-                                        <label className="flex cursor-pointer items-center gap-2 text-sm text-text">
-                                            <input type="checkbox" className={formStyles.checkbox} checked={showLocation}
-                                                onChange={e => setShowLocation(e.target.checked)} />
-                                            Warehouse location
-                                        </label>}
+                                    <h4 className="font-semibold text-brand-blue">Inventory linked to this drawing ({selectedTad.parts.length})</h4>
+                                    <button className={formStyles.ghostButton} onClick={editTadInventory}>Edit inventory</button>
                                 </div>
                                 {selectedTad.parts.length === 0
-                                    ? <p className="rounded border border-dashed border-line p-5 text-center text-sm text-text-muted">No parts recorded.</p>
+                                    ? <p className="rounded border border-dashed border-line p-4 text-center text-sm text-text-muted">
+                                        No inventory items are linked to this drawing yet.
+                                    </p>
                                     : <div className="overflow-x-auto rounded border border-line">
                                         <table className="w-full border-collapse text-sm">
                                             <thead><tr className="bg-main-background text-left text-text-muted">
-                                                {["Part #", "Customer #", "Description", ...(showLocation ? ["Location"] : []), "TAD item #", "Qty / valve", "Qty used", "In stock", "Qty needed", "Qty to buy", "Delivery (weeks)"].map(label =>
+                                                {["Part #", "Description", "Location", "Qty / assembly", "In stock", "Needed", "To buy"].map(label =>
                                                     <th key={label} className="whitespace-nowrap border-b border-line px-3 py-2 font-semibold">{label}</th>)}
                                             </tr></thead>
                                             <tbody>
                                                 {selectedTad.parts.map(part =>
                                                     <tr key={part.id} className="border-b border-line last:border-0">
                                                         <td className="whitespace-nowrap px-3 py-2 font-semibold text-brand-blue">{part.partNumber || "—"}</td>
-                                                        <td className="whitespace-nowrap px-3 py-2">{part.customerNumber || "—"}</td>
                                                         <td className="min-w-48 px-3 py-2">{part.description || "—"}</td>
-                                                        {showLocation && <td className="whitespace-nowrap px-3 py-2">{part.location || "—"}</td>}
-                                                        <td className="whitespace-nowrap px-3 py-2">{part.tadItemNum || "—"}</td>
+                                                        <td className="whitespace-nowrap px-3 py-2">{part.location || "—"}</td>
                                                         <td className="px-3 py-2 text-right tabular-nums">{part.qtyPerValve}</td>
-                                                        <td className="px-3 py-2 text-right tabular-nums">{part.qtyUsed}</td>
                                                         <td className="px-3 py-2 text-right tabular-nums">{part.qtyInStock}</td>
                                                         <td className="px-3 py-2 text-right tabular-nums">{part.qtyNeeded}</td>
                                                         <td className={`px-3 py-2 text-right tabular-nums ${part.qtyToBuy > 0 ? "font-bold text-red-500" : ""}`}>{part.qtyToBuy}</td>
-                                                        <td className="px-3 py-2 text-right tabular-nums">{part.deliveryWeeks}</td>
                                                     </tr>)}
                                             </tbody>
                                         </table>
@@ -798,8 +1105,8 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                             </section>
                             {selectedTad.drawing && <section className="flex flex-col gap-2 border-t border-line pt-4">
                                 <h3 className="font-semibold text-brand-blue">Drawing</h3>
-                                <img src={selectedTad.drawing.url} alt={`TAD drawing for ${selectedTad.name}`}
-                                    className="max-h-96 max-w-full self-start rounded border border-line bg-white object-contain" />
+                                <TadDrawingAttachment drawing={selectedTad.drawing}
+                                    alt={`TAD drawing for ${selectedTad.name}`} />
                             </section>}
                         </div>}
 
@@ -826,6 +1133,32 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                         Select a TAD to view and edit its details.
                     </div>}
             </div>}
+        </section>
+
+        <InventorySection
+            tads={tads}
+            selectedTadId={selectedTad?.id ?? ""}
+            disabled={isEditing}
+            onSelectTad={id => setSelectedId(id)}
+            onAddPart={(tadId, part) => {
+                const tad = tads.find(item => item.id === tadId)
+                if (!tad) throw new Error(`Cannot add inventory to unknown TAD: ${tadId}`)
+                onUpdateTad({ ...tad, parts: [...tad.parts, part] })
+                setToast("Inventory item added.")
+            }}
+            onUpdatePart={(tadId, part) => {
+                const tad = tads.find(item => item.id === tadId)
+                if (!tad) throw new Error(`Cannot update inventory for unknown TAD: ${tadId}`)
+                onUpdateTad({ ...tad, parts: tad.parts.map(existing => existing.id === part.id ? part : existing) })
+                setToast("Inventory item updated.")
+            }}
+            onDeletePart={(tadId, partId) => {
+                const tad = tads.find(item => item.id === tadId)
+                if (!tad) throw new Error(`Cannot remove inventory from unknown TAD: ${tadId}`)
+                onUpdateTad({ ...tad, parts: tad.parts.filter(part => part.id !== partId) })
+                setToast("Inventory item removed.")
+            }} />
+
         {confirmingDelete && selectedTad &&
             <Modal title="Delete TAD?" onClose={() => setConfirmingDelete(false)} footer={<>
                     <button className={formStyles.ghostButton} onClick={() => setConfirmingDelete(false)}>Cancel</button>
