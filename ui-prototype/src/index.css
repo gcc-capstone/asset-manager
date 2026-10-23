@@ -177,8 +177,18 @@ h1,h2,h3,.logo-text {
 
   /* task card shown in Tasks view */
   .task-card {
-    @apply w-full border border-line border-l-4 border-l-brand-blue bg-main-background-2 p-3 text-left;
+    @apply w-full border border-line border-l-4 border-l-brand-blue bg-main-background-2 px-2 py-1.5 text-left;
     @apply transition hover:border-brand-green hover:outline hover:outline-2 hover:outline-brand-green;
     @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-green;
+  }
+
+  .calendar-outage-day {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0,
+      transparent 8px,
+      rgb(220 38 38 / 18%) 8px,
+      rgb(220 38 38 / 18%) 13px
+    );
   }
 }

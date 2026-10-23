@@ -40,6 +40,7 @@ function isPdf(drawing: Drawing): boolean {
 function PlantDetailView({
     plant,
     outages,
+    focusOutage = null,
     tads,
     onAddOutage,
     onAddTad,
@@ -51,9 +52,11 @@ function PlantDetailView({
     onBack,
     backToTasks = false,
     initialTadId = null,
+    backToCalendar = false,
 }: {
     plant: Plant,
     outages: Outage[],
+    focusOutage?: Outage | null,
     tads: Tad[],
     onAddOutage: (outage: Outage) => void,
     onAddTad: (tad: Tad) => void,
@@ -66,6 +69,7 @@ function PlantDetailView({
     backToTasks?: boolean,
     /* Open the page on Assets with this TAD selected (e.g. a TAD or part picked from the header search) */
     initialTadId?: string | null,
+    backToCalendar?: boolean,
 }): React.JSX.Element {
 
     /* State that holds the selected sidebar section */
@@ -92,7 +96,7 @@ function PlantDetailView({
         <div className="mb-6 flex flex-col gap-1 border-b border-line pb-4">
             <button type="button" onClick={onBack}
                 className="w-fit text-sm text-text-muted transition-colors hover:text-brand-green cursor-pointer">
-                {backToTasks ? "← Back to tasks" : "← All plants"}
+                {backToCalendar ? "← Back to calendar" : backToTasks ? "← Back to tasks" : "← All plants"}
             </button>
             <h1 className="text-2xl text-text">
                 {plant.name}{" "}
@@ -118,6 +122,7 @@ function PlantDetailView({
                 {section === "Outages" && <PlantOutages
                     plant={plant}
                     outages={outages}
+                    focusOutage={focusOutage}
                     tads={tads.filter(tad => tad.plant === plant.name)}
                     onAddOutage={onAddOutage}
                     onOpenTad={openTad}
@@ -142,9 +147,20 @@ function PlantDetailView({
  * @param tads This plant's TADs (the ones managed under Assets)
  * @param onOpenTad Called with a TAD's id when it's clicked on an outage (opens it under Assets)
  */
-function PlantOutages({ plant, outages, tads, onAddOutage, onOpenTad, onOpenReport, submittedReportIds, onReportSubmitted }: {
+function PlantOutages({
+    plant,
+    outages,
+    focusOutage,
+    tads,
+    onAddOutage,
+    onOpenTad,
+    onOpenReport,
+    submittedReportIds,
+    onReportSubmitted,
+}: {
     plant: Plant,
     outages: Outage[],
+    focusOutage: Outage | null,
     tads: Tad[],
     onAddOutage: (outage: Outage) => void,
     onOpenTad: (id: string) => void,
@@ -152,30 +168,42 @@ function PlantOutages({ plant, outages, tads, onAddOutage, onOpenTad, onOpenRepo
     submittedReportIds: Set<string>,
     onReportSubmitted: (outage: Outage) => void,
 }): React.JSX.Element {
+    const [focusedOutageElement, setFocusedOutageElement] = useState<HTMLElement | null>(null);
     const upcoming = upcomingOutages(plant, outages);
+    const displayedOutages = focusOutage?.plant === plant.name && !upcoming.includes(focusOutage)
+        ? [...upcoming, focusOutage].sort((a, b) => a.start.localeCompare(b.start))
+        : upcoming;
 
     /* Whether the Add outage popup is open */
     const [adding, setAdding] = useState(false);
 
+    useEffect(() => {
+        if (focusOutage?.plant === plant.name) {
+            focusedOutageElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    }, [focusOutage, focusedOutageElement, plant.name]);
+
     return <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl text-text">
-                Upcoming Outages <span className="text-base font-normal text-text-muted">{upcoming.length}</span>
+                Outages <span className="text-base font-normal text-text-muted">{displayedOutages.length}</span>
             </h2>
             <button className={formStyles.primaryButton} onClick={() => setAdding(true)}>+ Add outage</button>
         </div>
 
-        {upcoming.length === 0
+        {displayedOutages.length === 0
             ? <p className="rounded-lg border border-dashed border-line p-8 text-center text-text-muted">
                 No upcoming outages scheduled. Click <b>+ Add outage</b> to schedule one.
             </p>
             : <ul className="flex flex-col gap-4">
-                {upcoming.map((outage, index) =>
-                    <li key={outage.id ?? `${outage.start}-${index}`}>
+                {displayedOutages.map((outage, index) =>
+                    <li key={outage.id ?? `${outage.plant}-${outage.start}-${outage.end}-${index}`}>
                         <OutageCard
                             outage={outage}
                             tads={tads}
                             onOpenTad={onOpenTad}
+                            isFocused={outage === focusOutage}
+                            onFocusElement={outage === focusOutage ? setFocusedOutageElement : undefined}
                             onOpenReport={onOpenReport}
                             reportSubmitted={submittedReportIds.has(outage.id ?? `${outage.plant}-${outage.start}`)}
                             onReportSubmitted={() => onReportSubmitted(outage)} />
@@ -203,13 +231,24 @@ function OutageTypeBadge({ type }: { type: OutageType }): React.JSX.Element {
 /** ----------------------------------------------------------------------------------------------------------------
  * One outage: dates, type, description, and the TADs it covers
  */
-function OutageCard({ outage, tads, onOpenTad, onOpenReport, reportSubmitted, onReportSubmitted }: {
+function OutageCard({
+    outage,
+    tads,
+    onOpenTad,
+    onOpenReport,
+    reportSubmitted,
+    onReportSubmitted,
+    isFocused = false,
+    onFocusElement,
+}: {
     outage: Outage,
     tads: Tad[],
     onOpenTad: (id: string) => void,
     onOpenReport: (outage: Outage) => void,
     reportSubmitted: boolean,
     onReportSubmitted: () => void,
+    isFocused?: boolean,
+    onFocusElement?: (element: HTMLElement | null) => void,
 }): React.JSX.Element {
     /* Look up the outage's TADs (any that were deleted under Assets are skipped) */
     const linkedTads = (outage.tadIds ?? [])
@@ -219,7 +258,10 @@ function OutageCard({ outage, tads, onOpenTad, onOpenReport, reportSubmitted, on
     const inProgress = outage.start <= todayString();
     const pdfInputId = `outage-pdf-${outage.id ?? outage.start}`
 
-    return <article className="flex flex-col gap-4 rounded-lg border border-line bg-main-background-2 p-5">
+    return <article
+        ref={onFocusElement}
+        className={`flex flex-col gap-4 rounded-lg border bg-main-background-2 p-5 ${isFocused ? "border-red-600 ring-2 ring-red-500" : "border-line"}`}
+    >
 
         {/* Dates and type */}
         <div className="flex flex-wrap items-start justify-between gap-3">
