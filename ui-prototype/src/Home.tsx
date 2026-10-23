@@ -6,6 +6,7 @@ import ContractorReportView from './views/ContractorReportView'
 import OutageServiceReportView from './views/OutageServiceReportView'
 import TasksView from './views/TasksView'
 import { App } from './components/Components'
+import { GlobalSearch } from './components/GlobalSearch'
 import db, { seededTads, type Outage, type Plant, type Task, type Tad } from './data/Data'
 import { useEffect, useState } from 'react'
 
@@ -55,6 +56,22 @@ function Home(): React.JSX.Element {
 
   /* TADs are prototype state so edits persist while navigating between plants. */
   const [tads, setTads] = useState<Tad[]>(() => seededTads);
+
+  /* Where the plant page should open. `nonce` changes on every navigation so the page resets
+     even when the same plant is opened again (e.g. a different TAD from the search). */
+  const [plantPageTarget, setPlantPageTarget] = useState<{ tadId: string | null, nonce: number }>({ tadId: null, nonce: 0 });
+
+  /* Opens a plant's page, optionally straight to one of its TADs under Assets */
+  function openPlant(plant: Plant, tadId: string | null = null) {
+    setPlantPageTarget({ tadId, nonce: Date.now() });
+    setSelectedPlant(plant);
+  }
+
+  /* Opens a plant or TAD picked from the header search, from anywhere in the app */
+  function openFromSearch(plant: Plant, tadId: string | null = null) {
+    selectTab("Plants");
+    openPlant(plant, tadId);
+  }
   
   /* Switching header tabs always goes back to that tab's starting page */
   function selectTab(tab: string) {
@@ -72,7 +89,7 @@ function Home(): React.JSX.Element {
   }
 
   function openPlantFromTask(plant: Plant) {
-    setSelectedPlant(plant);
+    openPlant(plant);
     setSelectedOutage(null);
     setPlantOpenedFromTask(true);
     setPlantOpenedFromCalendar(false);
@@ -84,7 +101,7 @@ function Home(): React.JSX.Element {
     if (!plant) {
       throw new Error(`Cannot open outage for unknown plant "${outage.plant}".`);
     }
-    setSelectedPlant(plant);
+    openPlant(plant);
     setSelectedOutage(outage);
     setPlantOpenedFromTask(false);
     setPlantOpenedFromCalendar(true);
@@ -168,13 +185,24 @@ function Home(): React.JSX.Element {
       </main>;
   }
 
-  return <App.MainArea activeTab={activeTab} onTabSelect={selectTab}>
+  return <App.MainArea activeTab={activeTab} onTabSelect={selectTab} search={
+    <GlobalSearch
+      plants={db.plants}
+      tads={tads}
+      onOpenPlant={plant => openFromSearch(plant)}
+      onOpenTad={tad => {
+        const plant = db.plants.find(item => item.name === tad.plant);
+        if (plant) openFromSearch(plant, tad.id);
+      }} />
+  }>
 
     {
       /* Plants tab: the plant list, or one plant's page once it's clicked */
       activeTab === "Plants"
       ? (selectedPlant
         ? <PlantDetailView
+          key={`${selectedPlant.name}-${plantPageTarget.nonce}`}
+          initialTadId={plantPageTarget.tadId}
           plant={selectedPlant}
           outages={outages}
           focusOutage={selectedOutage}
@@ -193,7 +221,7 @@ function Home(): React.JSX.Element {
           backToCalendar={plantOpenedFromCalendar}
         />
         : <div className="px-6 py-4">
-          <PlantsView onSelect={setSelectedPlant} />
+          <PlantsView onSelect={plant => openPlant(plant)} />
         </div>)
 
       /* Admin tab: accounts and the plants each one can access */
