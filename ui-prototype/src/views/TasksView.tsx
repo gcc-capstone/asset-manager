@@ -43,7 +43,7 @@ function TaskList({
             {tasks.length === 0
                 ? <p className="app-label-text">{emptyMessage}</p>
                 : tasks.map((task) =>
-                    <button className="task-card" key={task.title} type="button" onClick={() => onTaskClick(task)}>
+                    <button className="task-card" key={task.id ?? task.title} type="button" onClick={() => onTaskClick(task)}>
                         <div className="flex items-start justify-between">
                             <h3 className="font-bold text-text">{task.title}</h3>
                             <span className={`text-sm font-semibold ${overdue ? "text-red-600" : "text-brand-blue"}`}>
@@ -356,7 +356,7 @@ function TasksView({
         <div className={`relative min-w-0 ${selectedTask ? "min-h-0 pt-12.5" : ""}`}>
             {selectedTask
                 ? <TaskDetailView
-                    key={selectedTask.title}
+                    key={selectedTask.id ?? selectedTask.title}
                     task={selectedTask}
                     isNewTask={selectedTask === newTask}
                     isPast={!selectedTask.completed && selectedTask.dueDate < today}

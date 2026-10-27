@@ -1,7 +1,10 @@
 import { Fragment, useEffect, useState } from 'react'
-import { outageTypes, type Drawing, type Outage, type OutageType, type Plant, type Tad, type TadPart } from '../data/Data'
+import db, { outageTypes, replaceTasks, type Drawing, type Outage, type OutageType, type Plant, type Tad, type TadPart } from '../data/Data'
+import { COMMON_INTERVALS_MONTHS, RECURRENCE_HORIZON_YEARS, STANDARD_OUTAGE_TASKS, buildOutageTasks, describeTaskTiming, outageOccurrences } from '../data/Recurrence'
 import { App } from "../components/Components"
 import { Modal, formStyles } from '../components/Modal'
+import { BomModal } from '../components/BomModal'
+import { AddFlagButton, FLAG_MAX_LENGTH, FlagBadge, FlagModal } from '../components/OutageFlag'
 
 /** The sections listed in the left sidebar when a plant is open */
 type Section = "Outages" | "Info" | "Assets"
@@ -43,6 +46,7 @@ function PlantDetailView({
     focusOutage = null,
     tads,
     onAddOutage,
+    onUpdateOutage,
     onAddTad,
     onUpdateTad,
     onDeleteTad,
@@ -59,6 +63,8 @@ function PlantDetailView({
     focusOutage?: Outage | null,
     tads: Tad[],
     onAddOutage: (outage: Outage) => void,
+    /* Saves a changed outage (e.g. its flag), matched by id */
+    onUpdateOutage: (outage: Outage) => void,
     onAddTad: (tad: Tad) => void,
     onUpdateTad: (tad: Tad) => void,
     onDeleteTad: (id: string) => void,
@@ -125,6 +131,7 @@ function PlantDetailView({
                     focusOutage={focusOutage}
                     tads={tads.filter(tad => tad.plant === plant.name)}
                     onAddOutage={onAddOutage}
+                    onUpdateOutage={onUpdateOutage}
                     onOpenTad={openTad}
                     onOpenReport={onOpenReport}
                     submittedReportIds={submittedReportIds}
@@ -153,6 +160,7 @@ function PlantOutages({
     focusOutage,
     tads,
     onAddOutage,
+    onUpdateOutage,
     onOpenTad,
     onOpenReport,
     submittedReportIds,
@@ -163,6 +171,7 @@ function PlantOutages({
     focusOutage: Outage | null,
     tads: Tad[],
     onAddOutage: (outage: Outage) => void,
+    onUpdateOutage: (outage: Outage) => void,
     onOpenTad: (id: string) => void,
     onOpenReport: (outage: Outage) => void,
     submittedReportIds: Set<string>,
@@ -177,6 +186,20 @@ function PlantOutages({
     /* Whether the Add outage popup is open */
     const [adding, setAdding] = useState(false);
 
+    /* Confirmation shown after adding outages, e.g. "Added 4 outages and 14 tasks." */
+    const [notice, setNotice] = useState('');
+
+    /* Adds every occurrence and (optionally) the standard tasks for each, then confirms */
+    function createOutages(newOutages: Outage[], createTasks: boolean) {
+        newOutages.forEach(onAddOutage);
+        const newTasks = createTasks ? newOutages.flatMap(outage => buildOutageTasks(outage, todayString())) : [];
+        if (newTasks.length) replaceTasks([...db.tasks, ...newTasks]);
+        const outageText = newOutages.length === 1 ? "1 outage" : `${newOutages.length} outages`;
+        const taskText = newTasks.length === 1 ? "1 task" : `${newTasks.length} tasks`;
+        setNotice(createTasks ? `Added ${outageText} and ${taskText} (see Tasks).` : `Added ${outageText}.`);
+        setAdding(false);
+    }
+
     useEffect(() => {
         if (focusOutage?.plant === plant.name) {
             focusedOutageElement?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -188,8 +211,9 @@ function PlantOutages({
             <h2 className="text-xl text-text">
                 Outages <span className="text-base font-normal text-text-muted">{displayedOutages.length}</span>
             </h2>
-            <button className={formStyles.primaryButton} onClick={() => setAdding(true)}>+ Add outage</button>
+            <button className={formStyles.primaryButton} onClick={() => { setNotice(''); setAdding(true) }}>+ Add outage</button>
         </div>
+        {notice && <p className="-mt-2 text-sm font-semibold text-brand-green" role="status">{notice}</p>}
 
         {displayedOutages.length === 0
             ? <p className="rounded-lg border border-dashed border-line p-8 text-center text-text-muted">
@@ -202,6 +226,7 @@ function PlantOutages({
                             outage={outage}
                             tads={tads}
                             onOpenTad={onOpenTad}
+                            onUpdate={onUpdateOutage}
                             isFocused={outage === focusOutage}
                             onFocusElement={outage === focusOutage ? setFocusedOutageElement : undefined}
                             onOpenReport={onOpenReport}
@@ -214,7 +239,7 @@ function PlantOutages({
             <AddOutageModal
                 plant={plant}
                 tads={tads}
-                onCreate={outage => { onAddOutage(outage); setAdding(false) }}
+                onCreate={createOutages}
                 onClose={() => setAdding(false)} />}
 
     </div>
@@ -235,6 +260,7 @@ function OutageCard({
     outage,
     tads,
     onOpenTad,
+    onUpdate,
     onOpenReport,
     reportSubmitted,
     onReportSubmitted,
@@ -244,6 +270,8 @@ function OutageCard({
     outage: Outage,
     tads: Tad[],
     onOpenTad: (id: string) => void,
+    /* Saves this outage with changes (used for the flag) */
+    onUpdate: (outage: Outage) => void,
     onOpenReport: (outage: Outage) => void,
     reportSubmitted: boolean,
     onReportSubmitted: () => void,
@@ -257,6 +285,11 @@ function OutageCard({
     const outageTads = linkedTads.length > 0 ? linkedTads : tads.slice(0, 1);
     const inProgress = outage.start <= todayString();
     const pdfInputId = `outage-pdf-${outage.id ?? outage.start}`
+    /* Bill of Materials popup, and the confirmation shown after emailing it */
+    const [bomOpen, setBomOpen] = useState(false)
+    const [bomNotice, setBomNotice] = useState("")
+    /* Flag popup */
+    const [flagging, setFlagging] = useState(false)
 
     return <article
         ref={onFocusElement}
@@ -271,9 +304,16 @@ function OutageCard({
                 </span>
                 <span className="text-sm text-text-muted">
                     {durationDays(outage.start, outage.end)} days{inProgress && " · in progress"}
+                    {outage.repeatEveryMonths && <> · <span title="Repeating outage">↻ Every {outage.repeatEveryMonths} months</span></>}
                 </span>
             </div>
-            <OutageTypeBadge type={outage.type} />
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+                {/* Flag (click to add or edit), then Major/Minor */}
+                {outage.flag
+                    ? <FlagBadge text={outage.flag} onClick={() => setFlagging(true)} />
+                    : <AddFlagButton onClick={() => setFlagging(true)} />}
+                <OutageTypeBadge type={outage.type} />
+            </div>
         </div>
 
         {/* Description */}
@@ -298,8 +338,12 @@ function OutageCard({
                     </button>)}
         </div>
 
-        {/* Service report actions (secondary, so "+ Add outage" stays the main action on the page) */}
+        {/* Bill of Materials and service report actions (secondary, so "+ Add outage" stays the main action on the page) */}
         <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className={formStyles.ghostButton} disabled={outageTads.length === 0}
+                onClick={() => { setBomNotice(""); setBomOpen(true) }}>
+                Bill of Materials
+            </button>
             {reportSubmitted
                 ? <button type="button" className={formStyles.ghostButton} onClick={() => onOpenReport(outage)}>
                     View report
@@ -319,6 +363,20 @@ function OutageCard({
                     </button>
                 </>}
         </div>
+        {bomNotice && <p className="-mt-2 text-sm font-semibold text-brand-green" role="status">{bomNotice}</p>}
+
+        {bomOpen &&
+            <BomModal
+                outage={outage}
+                tads={outageTads}
+                onSent={message => { setBomNotice(message); setBomOpen(false) }}
+                onClose={() => setBomOpen(false)} />}
+
+        {flagging &&
+            <FlagModal
+                initial={outage.flag ?? ""}
+                onSave={text => { onUpdate({ ...outage, flag: text || undefined }); setFlagging(false) }}
+                onClose={() => setFlagging(false)} />}
     </article>
 }
 
@@ -591,13 +649,20 @@ function TadDrawingAttachment({ drawing, alt }: { drawing: Drawing, alt: string 
 function AddOutageModal({ plant, tads, onCreate, onClose }: {
     plant: Plant,
     tads: Tad[],
-    onCreate: (outage: Outage) => void,
+    /* Called with every occurrence to add (one, or several for a repeating outage) */
+    onCreate: (outages: Outage[], createTasks: boolean) => void,
     onClose: () => void,
 }): React.JSX.Element {
     const [start, setStart] = useState('');
+    const [repeats, setRepeats] = useState(false);
+    const [everyMonths, setEveryMonths] = useState(18);
+    const [endsOn, setEndsOn] = useState<'never' | 'date'>('never');
+    const [repeatUntil, setRepeatUntil] = useState('');
+    const [createTasks, setCreateTasks] = useState(true);
     const [end, setEnd] = useState('');
     const [type, setType] = useState<OutageType>("Major");
     const [description, setDescription] = useState('');
+    const [flag, setFlag] = useState('');
     const [tadIds, setTadIds] = useState<string[]>(() => tads[0] ? [tads[0].id] : []);
     const [tadSearch, setTadSearch] = useState('');
     const [error, setError] = useState('');
@@ -620,17 +685,30 @@ function AddOutageModal({ plant, tads, onCreate, onClose }: {
         const selectedTadIds = tads.map(tad => tad.id).filter(id => tadIds.includes(id));
         if (selectedTadIds.length === 0) return setError('Select at least one TAD for every outage.');
 
-        onCreate({
-            id: `outage-${Date.now()}`,
+        if (repeats && (!Number.isInteger(everyMonths) || everyMonths < 1)) return setError('Enter how many months apart the outages are (1 or more).');
+        if (repeats && endsOn === 'date' && (!repeatUntil || repeatUntil < start)) return setError('Pick an end date for the repeats on or after the first outage.');
+
+        /* One outage, or every occurrence of a repeating one, all sharing the same details */
+        const seriesId = `outage-${Date.now()}`;
+        const dates = repeats ? occurrences : [{ start, end }];
+        onCreate(dates.map((occurrence, index) => ({
+            id: repeats ? `${seriesId}-${index + 1}` : seriesId,
             plant: plant.name,
-            start,
-            end,
+            start: occurrence.start,
+            end: occurrence.end,
             type,
             description: description.trim(),
+            ...(flag.trim() ? { flag: flag.trim() } : {}),
             /* Keep the TADs in the same order they're listed under Assets */
             tadIds: selectedTadIds,
-        });
+            ...(repeats ? { seriesId, repeatEveryMonths: everyMonths, repeatUntil: endsOn === 'date' ? repeatUntil : null } : {}),
+        })), createTasks);
     }
+
+    /* Every occurrence of the outage being entered (used for the preview and on save) */
+    const occurrences = repeats && start && end && end >= start && everyMonths >= 1
+        ? outageOccurrences(start, end, everyMonths, endsOn === 'date' && repeatUntil ? repeatUntil : null, todayString())
+        : [];
 
     return <Modal title={`Add outage · ${plant.name}`} onClose={onClose} wide footer={<>
         {error && <span className="mr-auto text-sm text-red-500" role="alert">{error}</span>}
@@ -670,12 +748,67 @@ function AddOutageModal({ plant, tads, onCreate, onClose }: {
                 </div>
             </fieldset>
 
+            {/* Repeats */}
+            <fieldset className="flex flex-col gap-3 rounded-lg border border-line p-3">
+                <legend className="sr-only">Repeats</legend>
+                <label className="flex w-fit cursor-pointer items-center gap-3 font-semibold text-text">
+                    <input type="checkbox" className={formStyles.checkbox} checked={repeats} onChange={e => setRepeats(e.target.checked)} />
+                    Repeats
+                </label>
+
+                {repeats && <>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <label htmlFor="outage-every" className="text-text">Every</label>
+                        <input id="outage-every" type="number" min={1} max={120} step={1} className={formStyles.input.replace("w-full", "w-20")}
+                            value={Number.isNaN(everyMonths) ? '' : everyMonths} onChange={e => setEveryMonths(parseInt(e.target.value, 10))} />
+                        <span className="text-text">months</span>
+                        <span className="ml-2 flex gap-1" role="group" aria-label="Common intervals">
+                            {COMMON_INTERVALS_MONTHS.map(months =>
+                                <button key={months} type="button" onClick={() => setEveryMonths(months)}
+                                    aria-pressed={everyMonths === months}
+                                    className={`rounded-full border px-3 py-1 text-sm transition-colors cursor-pointer ${everyMonths === months ? 'border-brand-blue bg-brand-blue text-main-background' : 'border-line text-text-muted hover:text-text'}`}>
+                                    {months}
+                                </button>)}
+                        </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2" role="radiogroup" aria-label="Ends">
+                        <span className="text-text">Ends</span>
+                        <label className="flex cursor-pointer items-center gap-2 text-text">
+                            <input type="radio" name="outage-ends" checked={endsOn === 'never'} onChange={() => setEndsOn('never')} className="accent-brand-blue" />
+                            Never
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2 text-text">
+                            <input type="radio" name="outage-ends" checked={endsOn === 'date'} onChange={() => setEndsOn('date')} className="accent-brand-blue" />
+                            On
+                        </label>
+                        <label htmlFor="outage-repeat-until" className="sr-only">Repeat until</label>
+                        <input id="outage-repeat-until" type="date" className={formStyles.input.replace("w-full", "w-auto")} value={repeatUntil}
+                            onChange={e => { setRepeatUntil(e.target.value); setEndsOn('date') }} />
+                    </div>
+
+                    <p className="text-sm text-text-muted" aria-live="polite">
+                        {occurrences.length === 0
+                            ? 'Pick the first outage dates to see when it repeats.'
+                            : <>{occurrences.length} outage{occurrences.length === 1 ? '' : 's'}{endsOn === 'never' && ` in the next ${RECURRENCE_HORIZON_YEARS} years`}: {' '}
+                                {occurrences.slice(0, 4).map(o => formatDate(o.start)).join(' · ')}{occurrences.length > 4 && ' …'}</>}
+                    </p>
+                </>}
+            </fieldset>
+
             {/* Description */}
             <div className="flex flex-col gap-1">
                 <label className={formStyles.label} htmlFor="outage-description">Description</label>
                 <textarea id="outage-description" rows={4} className={formStyles.input + " resize-y"} value={description}
                     onChange={e => setDescription(e.target.value)}
                     placeholder="What's being worked on, scope, affected units, contractors, notes..." />
+            </div>
+
+            {/* Optional flag */}
+            <div className="flex flex-col gap-1">
+                <label className={formStyles.label} htmlFor="outage-flag">Flag <span className="text-text-muted">(optional) · e.g. Waiting on parts</span></label>
+                <input id="outage-flag" className={formStyles.input} value={flag} maxLength={FLAG_MAX_LENGTH}
+                    onChange={e => setFlag(e.target.value)} />
             </div>
 
             {/* Pick existing TADs */}
@@ -717,6 +850,21 @@ function AddOutageModal({ plant, tads, onCreate, onClose }: {
                                 <li className="px-3 py-3 text-sm text-text-muted">No TADs match "{tadSearch}".</li>}
                         </ul>
                     </>}
+            </fieldset>
+
+            {/* Standard tasks */}
+            <fieldset className="flex flex-col gap-2">
+                <legend className="sr-only">Tasks</legend>
+                <label className="flex w-fit cursor-pointer items-center gap-3 font-semibold text-text">
+                    <input type="checkbox" className={formStyles.checkbox} checked={createTasks} onChange={e => setCreateTasks(e.target.checked)} />
+                    Create standard tasks{repeats ? ' for each outage' : ''}
+                </label>
+                {createTasks &&
+                    <ul className="ml-7 flex flex-col gap-0.5 text-sm text-text-muted">
+                        {STANDARD_OUTAGE_TASKS.map(task =>
+                            <li key={task.key}><span className="text-text">{task.title}</span> · {describeTaskTiming(task)}</li>)}
+                        <li className="text-xs">Tasks that would already be past due are skipped.</li>
+                    </ul>}
             </fieldset>
         </form>
     </Modal>

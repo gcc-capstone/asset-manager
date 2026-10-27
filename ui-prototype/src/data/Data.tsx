@@ -53,6 +53,13 @@ export type Outage = {
     description: string,
     /* IDs of the plant's Top Assembly Drawings (TADs) this outage covers */
     tadIds?: string[],
+    /* Repeating outages: every occurrence shares a seriesId and repeats every N months */
+    seriesId?: string,
+    repeatEveryMonths?: number,
+    /* Last allowed start date for the series, or null for "never" (limited to 5 years ahead) */
+    repeatUntil?: string | null,
+    /* Optional flag with custom text, e.g. "Waiting on parts" (shown on the outage and the calendar) */
+    flag?: string,
 }
 
 /** The outage types you can pick when adding an outage */
@@ -63,6 +70,10 @@ export type OutageType = typeof outageTypes[number]
 
 /* A scheduled task */
 export type Task = {
+    /* Optional unique id (tasks created from an outage have one; several can share a title) */
+    id?: string,
+    /* The outage this task was created for, if any */
+    outageId?: string,
     title: string,
     completed: boolean | undefined,
     plant: string,
@@ -161,7 +172,7 @@ export const db = {
 
     /* Scheduled outages, matched to plants by name */
     outages: [
-        { plant: "Beaver Valley Nuclear Generating Station", start: "2026-10-26", end: "2026-11-20", type: "Major", description: "Unit 1 refueling outage" },
+        { plant: "Beaver Valley Nuclear Generating Station", start: "2026-10-26", end: "2026-11-20", type: "Major", description: "Unit 1 refueling outage", flag: "Waiting on parts" },
         { plant: "Beaver Valley Nuclear Generating Station", start: "2027-04-12", end: "2027-05-07", type: "Major", description: "Unit 2 refueling outage" },
         { plant: "Limerick Generating Station", start: "2026-11-09", end: "2026-11-13", type: "Minor", description: "Condenser tube inspection" },
         { plant: "Limerick Generating Station", start: "2027-03-15", end: "2027-04-09", type: "Major", description: "Unit 2 refueling outage" },

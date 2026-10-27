@@ -137,6 +137,12 @@ function Home(): React.JSX.Element {
     window.history.pushState({}, "", `/DO1?outage=${encodeURIComponent(outage.id ?? "")}`);
   }
 
+  /* Saves a changed outage (e.g. a new flag), keeping the selected outage pointing at the new copy */
+  function updateOutage(updated: Outage) {
+    setOutages(current => current.map(outage => outage.id === updated.id ? updated : outage));
+    setSelectedOutage(current => current?.id === updated.id ? updated : current);
+  }
+
   function markReportSubmitted(outage: Outage) {
     const reportId = outage.id ?? `${outage.plant}-${outage.start}`;
     setSubmittedReportIds(current => new Set(current).add(reportId));
@@ -208,6 +214,7 @@ function Home(): React.JSX.Element {
           focusOutage={selectedOutage}
           tads={tads}
           onAddOutage={outage => setOutages(current => [...current, { ...outage, id: outage.id ?? `outage-${Date.now()}` }])}
+          onUpdateOutage={updateOutage}
           onAddTad={tad => setTads(current => [...current, tad])}
           onUpdateTad={updated => setTads(current => current.map(tad => tad.id === updated.id ? updated : tad))}
           onDeleteTad={id => setTads(current => current.filter(tad => tad.id !== id))}
