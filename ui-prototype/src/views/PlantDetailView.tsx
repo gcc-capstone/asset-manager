@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import db, { outageTypes, replaceTasks, type Drawing, type Outage, type OutageType, type Plant, type Tad, type TadPart } from '../data/Data'
+import db, { outageTypes, replaceTasks, type Drawing, type Outage, type OutageType, type Plant, type Tad, type TadPart, type TadTag } from '../data/Data'
 import { COMMON_INTERVALS_MONTHS, RECURRENCE_HORIZON_YEARS, STANDARD_OUTAGE_TASKS, buildOutageTasks, describeTaskTiming, outageOccurrences } from '../data/Recurrence'
 import { App } from "../components/Components"
 import { Modal, formStyles } from '../components/Modal'
@@ -17,6 +17,20 @@ function todayString(): string {
 /** Formats a "YYYY-MM-DD" date as e.g. "Oct 26, 2026" (parsed as local time so it doesn't shift a day) */
 function formatDate(date: string): string {
     return new Date(date + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+}
+
+/** Returns a drawing's tags, including a fallback for older TAD records that have only drawing-level fields. */
+function tadTags(tad: Tad): TadTag[] {
+    if (tad.tags?.length) return tad.tags;
+    return [{
+        id: `${tad.id}-tag`,
+        tagNumber: tad.tagNumber,
+        installationStatus: tad.installationStatus,
+        operationalStatus: tad.operationalStatus,
+        installDate: tad.installDate,
+        lastMaintenanceDate: tad.lastMaintenanceDate,
+        nextMaintenanceDate: tad.nextMaintenanceDate,
+    }];
 }
 
 /** Number of days an outage lasts, counting both the start and end day */
@@ -378,6 +392,15 @@ function OutageCard({
                 onSave={text => { onUpdate({ ...outage, flag: text || undefined }); setFlagging(false) }}
                 onClose={() => setFlagging(false)} />}
     </article>
+}
+
+function groupTadsByDrawing(tads: Tad[]): { key: string, representative: Tad, tags: Tad[] }[] {
+    const groups = new Map<string, Tad[]>()
+    tads.forEach(tad => {
+        const key = tad.drawing?.url || tad.drawing?.name || `tad:${tad.id}`
+        groups.set(key, [...(groups.get(key) ?? []), tad])
+    })
+    return Array.from(groups.entries()).map(([key, tags]) => ({ key, representative: tags[0], tags }))
 }
 
 function InventorySection({ tads, selectedTadId, disabled, onSelectTad, onAddPart, onUpdatePart, onDeletePart }: {
@@ -947,6 +970,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
             installDate: "",
             lastMaintenanceDate: "",
             nextMaintenanceDate: "",
+            tags: [],
             drawing: null,
             parts: [],
         };
@@ -959,6 +983,28 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
 
     function update(patch: Partial<Tad>) {
         if (selectedTad && isEditing) setDraftTad({ ...selectedTad, ...patch });
+    }
+
+    function updateTag(tagId: string, patch: Partial<TadTag>) {
+        if (!selectedTad) return;
+        update({ tags: tadTags(selectedTad).map(tag => tag.id === tagId ? { ...tag, ...patch } : tag) });
+    }
+
+    function addTag() {
+        if (!selectedTad) return;
+        update({ tags: [...tadTags(selectedTad), {
+            id: `tag-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            tagNumber: "",
+            installationStatus: "Not installed",
+            operationalStatus: "Unknown",
+            installDate: "",
+            lastMaintenanceDate: "",
+            nextMaintenanceDate: "",
+        }] });
+    }
+
+    function removeTag(tagId: string) {
+        if (selectedTad) update({ tags: tadTags(selectedTad).filter(tag => tag.id !== tagId) });
     }
 
     function updatePart(partId: string, patch: Partial<TadPart>) {
@@ -1090,7 +1136,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                             }}
                                 className={`flex w-full flex-col gap-1 rounded-lg border p-4 text-left transition-colors ${selectedId === tad.id ? "border-brand-green bg-main-background-2" : "border-line hover:border-brand-blue"}`}>
                                 <span className={`font-semibold ${selectedId === tad.id ? "text-brand-blue" : "text-text"}`}>{tad.name || "Unnamed TAD"}</span>
-                                <span className="text-sm text-text-muted">{tad.tagNumber || "No tag number"} · {tad.installationStatus}</span>
+                                <span className="text-sm text-text-muted">{tadTags(tad).length} tag{tadTags(tad).length === 1 ? "" : "s"} · {tad.drawing?.name || "No drawing file"}</span>
                             </button>
                         </li>)}
                 </ul>
@@ -1105,47 +1151,42 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                                 </button>)}
                         </div>}
                         {isEditing && <fieldset className="flex min-w-0 flex-col gap-5 border-0 p-0">
-                        {editorTab === "General Info" && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {editorTab === "General Info" && <>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <label className="flex flex-col gap-1">
                                 <span className={formStyles.label}>TAD name</span>
                                 <input className={formStyles.input} value={selectedTad.name}
                                     onChange={e => update({ name: e.target.value })} />
                             </label>
-                            <label className="flex flex-col gap-1">
-                                <span className={formStyles.label}>Tag number (optional)</span>
-                                <input className={formStyles.input} value={selectedTad.tagNumber}
-                                    onChange={e => update({ tagNumber: e.target.value })} />
-                            </label>
-                            <label className="flex flex-col gap-1">
-                                <span className={formStyles.label}>Installation status</span>
-                                <select className={formStyles.input} value={selectedTad.installationStatus}
-                                    onChange={e => update({ installationStatus: e.target.value as Tad["installationStatus"] })}>
-                                    {["Installed", "Spare", "Not installed", "Removed"].map(status => <option key={status}>{status}</option>)}
-                                </select>
-                            </label>
-                            <label className="flex flex-col gap-1">
-                                <span className={formStyles.label}>Operational status</span>
-                                <select className={formStyles.input} value={selectedTad.operationalStatus}
-                                    onChange={e => update({ operationalStatus: e.target.value as Tad["operationalStatus"] })}>
-                                    {["Active", "Inactive", "Unknown"].map(status => <option key={status}>{status}</option>)}
-                                </select>
-                            </label>
-                            <label className="flex flex-col gap-1">
-                                <span className={formStyles.label}>Install date</span>
-                                <input type="date" className={formStyles.input} value={selectedTad.installDate}
-                                    onChange={e => update({ installDate: e.target.value })} />
-                            </label>
-                            <label className="flex flex-col gap-1">
-                                <span className={formStyles.label}>Last maintenance</span>
-                                <input type="date" className={formStyles.input} value={selectedTad.lastMaintenanceDate}
-                                    onChange={e => update({ lastMaintenanceDate: e.target.value })} />
-                            </label>
-                            <label className="flex flex-col gap-1 sm:col-span-2">
-                                <span className={formStyles.label}>Next maintenance due</span>
-                                <input type="date" className={formStyles.input} value={selectedTad.nextMaintenanceDate}
-                                    onChange={e => update({ nextMaintenanceDate: e.target.value })} />
-                            </label>
-                        </div>}
+                            <div />
+                        </div>
+                            <section className="flex flex-col gap-3">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-semibold text-text">Tags associated with this TAD</h3>
+                                    <button type="button" className={formStyles.ghostButton} onClick={addTag}>+ Add tag</button>
+                                </div>
+                                {tadTags(selectedTad).map(tag =>
+                                    <div key={tag.id} className="grid grid-cols-1 gap-2 rounded-lg border border-line p-3 sm:grid-cols-2 xl:grid-cols-3">
+                                        <label className="flex flex-col gap-1"><span className={formStyles.label}>Tag number</span>
+                                            <input className={formStyles.input} value={tag.tagNumber} onChange={e => updateTag(tag.id, { tagNumber: e.target.value })} /></label>
+                                        <label className="flex flex-col gap-1"><span className={formStyles.label}>Installation status</span>
+                                            <select className={formStyles.input} value={tag.installationStatus} onChange={e => updateTag(tag.id, { installationStatus: e.target.value as TadTag["installationStatus"] })}>
+                                                {["Installed", "Spare", "Not installed", "Removed"].map(status => <option key={status}>{status}</option>)}</select></label>
+                                        <label className="flex flex-col gap-1"><span className={formStyles.label}>Operational status</span>
+                                            <select className={formStyles.input} value={tag.operationalStatus} onChange={e => updateTag(tag.id, { operationalStatus: e.target.value as TadTag["operationalStatus"] })}>
+                                                {["Active", "Inactive", "Unknown"].map(status => <option key={status}>{status}</option>)}</select></label>
+                                        <label className="flex flex-col gap-1"><span className={formStyles.label}>Install date</span>
+                                            <input type="date" className={formStyles.input} value={tag.installDate} onChange={e => updateTag(tag.id, { installDate: e.target.value })} /></label>
+                                        <label className="flex flex-col gap-1"><span className={formStyles.label}>Last maintenance</span>
+                                            <input type="date" className={formStyles.input} value={tag.lastMaintenanceDate} onChange={e => updateTag(tag.id, { lastMaintenanceDate: e.target.value })} /></label>
+                                        <label className="flex flex-col gap-1"><span className={formStyles.label}>Next maintenance</span>
+                                            <input type="date" className={formStyles.input} value={tag.nextMaintenanceDate} onChange={e => updateTag(tag.id, { nextMaintenanceDate: e.target.value })} /></label>
+                                        <div className="sm:col-span-2 xl:col-span-3 flex justify-end">
+                                            <button type="button" className="text-sm font-semibold text-red-500" onClick={() => removeTag(tag.id)}>Remove tag</button>
+                                        </div>
+                                    </div>)}
+                            </section>
+                        </> }
 
                         {editorTab === "Parts Info" && <section className="flex flex-col gap-3">
                             <div className="flex items-center justify-between gap-3">
@@ -1248,17 +1289,22 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                                         <span className="rounded-full bg-main-background px-3 py-1 text-text-muted">{selectedTad.operationalStatus}</span>
                                     </div>
                                 </div>
-                                <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                                    {[
-                                        ["Install date", selectedTad.installDate ? formatDate(selectedTad.installDate) : "Not recorded"],
-                                        ["Last maintenance", selectedTad.lastMaintenanceDate ? formatDate(selectedTad.lastMaintenanceDate) : "Not recorded"],
-                                        ["Next maintenance", selectedTad.nextMaintenanceDate ? formatDate(selectedTad.nextMaintenanceDate) : "Not scheduled"],
-                                    ].map(([label, value]) =>
-                                        <div key={label} className="rounded border border-line bg-main-background px-3 py-2">
-                                            <dt className="text-xs font-semibold uppercase text-text-muted">{label}</dt>
-                                            <dd className="mt-1 font-medium text-text">{value}</dd>
-                                        </div>)}
-                                </dl>
+                                <div className="overflow-x-auto rounded border border-line">
+                                    <table className="w-full border-collapse text-sm">
+                                        <thead><tr className="bg-main-background text-left text-text-muted">
+                                            {["Tag", "Install date", "Last maintenance", "Next maintenance"].map(label =>
+                                                <th key={label} className="whitespace-nowrap border-b border-line px-3 py-2 font-semibold">{label}</th>)}
+                                        </tr></thead>
+                                        <tbody>{tadTags(selectedTad).map(tag =>
+                                            <tr key={tag.id} className="border-b border-line last:border-0">
+                                                <td className="whitespace-nowrap px-3 py-2 font-semibold text-text">{tag.tagNumber || "Unnamed tag"}</td>
+                                                <td className="whitespace-nowrap px-3 py-2">{tag.installDate ? formatDate(tag.installDate) : "Not recorded"}</td>
+                                                <td className="whitespace-nowrap px-3 py-2">{tag.lastMaintenanceDate ? formatDate(tag.lastMaintenanceDate) : "Not recorded"}</td>
+                                                <td className="whitespace-nowrap px-3 py-2">{tag.nextMaintenanceDate ? formatDate(tag.nextMaintenanceDate) : "Not scheduled"}</td>
+                                            </tr>)}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </section>
                             <section className="flex flex-col gap-3 border-t border-line pt-4">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
