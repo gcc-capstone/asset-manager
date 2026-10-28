@@ -30,6 +30,16 @@ export type TadPart = {
     deliveryWeeks: number,
 }
 
+export type TadTag = {
+    id: string,
+    tagNumber: string,
+    installationStatus: "Installed" | "Spare" | "Not installed" | "Removed",
+    operationalStatus: "Active" | "Inactive" | "Unknown",
+    installDate: string,
+    lastMaintenanceDate: string,
+    maintenanceCycle: string,
+}
+
 export type Tad = {
     id: string,
     plant: string,
@@ -39,7 +49,8 @@ export type Tad = {
     operationalStatus: "Active" | "Inactive" | "Unknown",
     installDate: string,
     lastMaintenanceDate: string,
-    nextMaintenanceDate: string,
+    maintenanceCycle: string,
+    tags?: TadTag[],
     drawing: Drawing | null,
     parts: TadPart[],
 }
@@ -338,7 +349,16 @@ export const seededTads: Tad[] = db.plants.flatMap((plant, plantIndex) => {
             operationalStatus: ["Active", "Active", "Inactive", "Unknown"][plantIndex % 4] as Tad["operationalStatus"],
             installDate: `${2016 + plantIndex % 7}-${String(1 + plantIndex % 12).padStart(2, "0")}-15`,
             lastMaintenanceDate: `202${plantIndex % 5}-${String(1 + (plantIndex + drawingIndex) % 12).padStart(2, "0")}-10`,
-            nextMaintenanceDate: `2027-${String(1 + (plantIndex + drawingIndex) % 12).padStart(2, "0")}-20`,
+            maintenanceCycle: `${1 + (plantIndex + drawingIndex) % 12} months`,
+            tags: Array.from({ length: 2 }, (_, tagIndex) => ({
+                id: `${id}-tag-${tagIndex + 1}`,
+                tagNumber: `${tagIndex === 0 ? "TAD" : "TAG"}-${String(plantIndex + 1).padStart(2, "0")}-${drawingIndex + 1}-${tagIndex + 1}`,
+                installationStatus: ["Installed", "Spare", "Not installed", "Removed"][plantIndex % 4] as TadTag["installationStatus"],
+                operationalStatus: ["Active", "Active", "Inactive", "Unknown"][(plantIndex + tagIndex) % 4] as TadTag["operationalStatus"],
+                installDate: `${2016 + (plantIndex + tagIndex) % 7}-${String(1 + plantIndex % 12).padStart(2, "0")}-15`,
+                lastMaintenanceDate: `202${(plantIndex + tagIndex) % 5}-${String(1 + (plantIndex + drawingIndex + tagIndex) % 12).padStart(2, "0")}-10`,
+                maintenanceCycle: `${1 + (plantIndex + drawingIndex + tagIndex) % 12} months`,
+            })),
             drawing: { ...drawing },
             parts: [0, 1].map((partIndex) => {
                 const part = dummyPartCatalog[(plantIndex + drawingIndex + partIndex) % dummyPartCatalog.length]
