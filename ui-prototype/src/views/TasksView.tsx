@@ -20,39 +20,64 @@ function formatDate(date: string): string {
  * @return the React component for showing a list of task items.
 */
 function TaskList({
-    title,
     tasks,
+    outages,
     overdue = false,
     emptyMessage = `No ${overdue ? "overdue" : "upcoming"} tasks.`,
     onTaskClick,
+    onFilterTasksByOutage,
+    tabId,
 }: {
-    title: string,
     tasks: Task[],
+    outages: Outage[],
     overdue?: boolean,
     emptyMessage?: string,
     onTaskClick: (task: Task) => void,
+    onFilterTasksByOutage: (outage: Outage) => void,
+    tabId: string,
 }): React.JSX.Element {
 
-    return <section className="flex shrink-0 flex-col">
-        <div className="mb-2 flex items-center justify-between border-b-2 border-brand-blue pb-1">
-            <h2 className="text-xl font-bold text-brand-blue">{title}</h2>
-            <span className="app-label-text">{tasks.length}</span>
-        </div>
-        <div className="flex flex-col gap-2 pr-1">
+    return <section className="flex shrink-0 flex-col" role="tabpanel" aria-labelledby={tabId}>
+        <div className={`flex flex-col gap-2 pr-1 ${
+            tasks.length > 8 ? "max-h-[min(94vh,43rem)] overflow-y-auto overscroll-contain pr-2" : ""
+        }`}>
             {tasks.length === 0
                 ? <p className="app-label-text">{emptyMessage}</p>
-                : tasks.map((task) =>
-                    <button className="task-card" key={task.id ?? task.title} type="button" onClick={() => onTaskClick(task)}>
-                        <div className="flex items-start justify-between">
-                            <h3 className="font-bold text-text">{task.title}</h3>
-                            <span className={`text-sm font-semibold ${overdue ? "text-red-600" : "text-brand-blue"}`}>
-                                {formatDate(task.dueDate)}
-                            </span>
-                        </div>
-                        <p className="mt-0.5 text-sm text-text-muted">{task.plant}</p>
-                        <p className="mt-1 text-xs text-text-muted">{task.category}</p>
-                    </button>
-                )}
+                : tasks.map((task) => {
+                    const associatedOutage = outages.find((outage) => outage.id === task.outageId);
+                    return <div className="task-card flex items-center gap-2" key={task.id ?? task.title}>
+                        <button className="min-w-0 flex-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-green"
+                            type="button" onClick={() => onTaskClick(task)}>
+                            <div className="flex items-start justify-between">
+                                <h3 className="font-bold text-text">{task.title}</h3>
+                                <span className={`text-sm font-semibold ${overdue ? "text-red-600" : "text-brand-blue"}`}>
+                                    {formatDate(task.dueDate)}
+                                </span>
+                            </div>
+                            <div className="mt-0.5 flex min-w-0 items-center justify-between gap-2">
+                                <p className="truncate text-sm text-text-muted">{task.plant}</p>
+                                {associatedOutage &&
+                                    <span
+                                        title={`Associated outage: ${associatedOutage.description}`}
+                                        className="max-w-1/2 truncate text-right text-xs font-medium text-red-700 dark:text-red-300"
+                                    >
+                                        {associatedOutage.description}
+                                    </span>}
+                            </div>
+                            <p className="mt-1 text-xs text-text-muted">{task.category}</p>
+                        </button>
+                        {associatedOutage &&
+                            <button
+                                type="button"
+                                aria-label={`Filter tasks associated with ${associatedOutage.plant}: ${associatedOutage.description}`}
+                                title="Show tasks associated with this outage"
+                                onClick={() => onFilterTasksByOutage(associatedOutage)}
+                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm bg-amber-200/80 text-amber-700 hover:bg-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue [&>svg]:h-4 [&>svg]:w-4 [&>svg]:text-amber-700"
+                            >
+                                <App.Icon.MagnifyingGlass />
+                            </button>}
+                    </div>
+                })}
         </div>
     </section>
 }
@@ -69,18 +94,22 @@ function TaskDetailView({
     task,
     isNewTask,
     isPast,
+    outages,
     onTaskSelect,
     onTaskUpdate,
     onTaskDiscard,
-    onPlantSelect
+    onPlantSelect,
+    onOutageSelect,
 }: {
     task: Task,
     isNewTask: boolean,
     isPast: boolean,
+    outages: Outage[],
     onTaskSelect: (task: Task | null) => void,
     onTaskUpdate: (task: Task) => void,
     onTaskDiscard: (task: Task) => void,
     onPlantSelect: (plant: Plant) => void,
+    onOutageSelect: (outage: Outage) => void,
 }): React.JSX.Element {
 
     const [isEditing, setIsEditing] = useState(isNewTask);
@@ -88,6 +117,7 @@ function TaskDetailView({
     const formRef = useRef<HTMLFormElement>(null);
 
     const plant = db.plants.find((plant) => plant.name == task.plant);
+    const associatedOutage = outages.find((outage) => outage.id === task.outageId);
     const statusColor = task.completed ? "text-brand-green" : isPast ? "text-red-600" : "text-brand-blue";
     const fieldClassName = `w-full rounded-lg border border-brand-blue bg-main-background px-3 py-2 text-base
         text-brand-blue focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-green`;
@@ -150,6 +180,21 @@ function TaskDetailView({
                         {task.completed ? "Complete" : isPast ? "Overdue" : "Upcoming"}
                     </div>
                 </div>
+
+                {associatedOutage &&
+                    <div>
+                        <div className="text-sm text-text-muted">Associated outage</div>
+                        <button
+                            type="button"
+                            onClick={() => onOutageSelect(associatedOutage)}
+                            className="app-subtitle app-hover-text cursor-pointer text-left"
+                        >
+                            {associatedOutage.description} ({associatedOutage.plant})
+                            <span className="ml-2 text-sm text-text-muted">
+                                {formatDate(associatedOutage.start)} – {formatDate(associatedOutage.end)}
+                            </span>
+                        </button>
+                    </div>}
 
                 <div>
                     <div className="text-sm text-text-muted">Assignee</div>
@@ -282,29 +327,37 @@ function TasksView({
 }): React.JSX.Element {
 
     const [tasks, setTasks] = useState<Task[]>(db.tasks);
+    const [activeTaskList, setActiveTaskList] = useState<"upcoming" | "overdue" | "completed">("upcoming");
     const [newTask, setNewTask] = useState<Task | null>(null);
     const [taskCreated, setTaskCreated] = useState(false);
+    const [outageFilter, setOutageFilter] = useState<Outage | null>(null);
     const today: string = dateOffsetFromToday(0);
 
-    const upcomingTasks: Task[] = tasks
+    const visibleTasks = outageFilter?.id
+        ? tasks.filter((task) => task.outageId === outageFilter.id)
+        : outageFilter ? [] : tasks;
+    const upcomingTasks: Task[] = visibleTasks
         .filter((task) => !task.completed && task.dueDate >= today)
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-    const overdueTasks: Task[] = tasks
+    const overdueTasks: Task[] = visibleTasks
         .filter((task) => !task.completed && task.dueDate < today)
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-    const completedTasks: Task[] = tasks
+    const completedTasks: Task[] = visibleTasks
         .filter((task) => task.completed)
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
     function addTask() {
         setTaskCreated(false);
-        const plant = db.plants[0];
+        const plant = outageFilter
+            ? db.plants.find((candidate) => candidate.name === outageFilter.plant)
+            : db.plants[0];
         if (!plant) {
             throw new Error("Cannot create a task because there are no plants available.");
         }
 
         const task: Task = {
-            title: "",
+            title: "",5
+            outageId: outageFilter?.id,
             completed: false,
             plant: plant.name,
             assignee: undefined,
@@ -352,13 +405,50 @@ function TasksView({
                 Add task
             </button>
             {taskCreated && <p className="text-sm font-semibold text-brand-green" role="status">Task created successfully.</p>}
-            <TaskList title="Upcoming Tasks" tasks={upcomingTasks} onTaskClick={onTaskSelect} />
-            <TaskList title="Overdue Tasks" tasks={overdueTasks} overdue onTaskClick={onTaskSelect} />
+            {outageFilter &&
+                <div className="flex items-start justify-between gap-2 rounded border border-brand-blue/30 bg-brand-light-blue px-2 py-1.5 text-sm">
+                    <span>Tasks linked to <strong>{outageFilter.description}</strong></span>
+                    <button
+                        type="button"
+                        onClick={() => setOutageFilter(null)}
+                        className="shrink-0 font-semibold text-brand-blue hover:underline"
+                    >
+                        Clear filter
+                    </button>
+                </div>}
+            <div className="flex items-center border-b-2 border-brand-blue" role="tablist" aria-label="Task status">
+                {([
+                    ["upcoming", "Upcoming", upcomingTasks.length],
+                    ["overdue", "Overdue", overdueTasks.length],
+                    ["completed", "Completed", completedTasks.length],
+                ] as const).map(([key, label, count]) =>
+                    <button
+                        key={key}
+                        id={`task-tab-${key}`}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTaskList === key}
+                        onClick={() => setActiveTaskList(key)}
+                        className={`-mb-0.5 border-b-4 px-2 py-2 text-sm font-semibold transition-colors sm:px-3 ${
+                            activeTaskList === key
+                                ? "border-brand-green text-brand-blue"
+                                : "border-transparent text-text-muted hover:text-text"
+                        }`}
+                    >
+                        {label} ({count})
+                    </button>
+                )}
+            </div>
             <TaskList
-                title="Complete Tasks"
-                tasks={completedTasks}
-                emptyMessage="No complete tasks."
+                tasks={activeTaskList === "upcoming" ? upcomingTasks : activeTaskList === "overdue" ? overdueTasks : completedTasks}
+                outages={outages}
+                overdue={activeTaskList === "overdue"}
+                emptyMessage={outageFilter
+                    ? `No ${activeTaskList} tasks linked to this outage.`
+                    : activeTaskList === "completed" ? "No completed tasks." : `No ${activeTaskList} tasks.`}
                 onTaskClick={onTaskSelect}
+                onFilterTasksByOutage={setOutageFilter}
+                tabId={`task-tab-${activeTaskList}`}
             />
         </div>
         <div className={`relative min-w-0 ${selectedTask ? "min-h-0 pt-12.5" : ""}`}>
@@ -368,14 +458,17 @@ function TasksView({
                     task={selectedTask}
                     isNewTask={selectedTask === newTask}
                     isPast={!selectedTask.completed && selectedTask.dueDate < today}
+                    outages={outages}
                     onTaskSelect={onTaskSelect}
                     onTaskUpdate={updateTask}
                     onTaskDiscard={discardNewTask}
-                    onPlantSelect={onPlantSelect} />
+                    onPlantSelect={onPlantSelect}
+                    onOutageSelect={onOutageSelect} />
                 : <CalendarView
                     outages={outages}
                     onTaskClick={onTaskSelect}
                     onOutageClick={onOutageSelect}
+                    onFilterTasksByOutage={setOutageFilter}
                 />}
         </div>
     </div>

@@ -56,10 +56,12 @@ function CalendarView({
     outages,
     onTaskClick,
     onOutageClick,
+    onFilterTasksByOutage,
 }: {
     outages: Outage[],
     onTaskClick: (task: Task) => void,
     onOutageClick: (outage: Outage) => void,
+    onFilterTasksByOutage: (outage: Outage) => void,
 }): React.JSX.Element {
 
     const currentDate: Date = new Date();
@@ -109,14 +111,6 @@ function CalendarView({
                 />
             </div>
 
-            <fieldset className="mb-4 flex w-full flex-wrap items-center gap-x-5 gap-y-2 border-y border-line py-2">
-                <legend className="sr-only">Showing</legend>
-                <span className="app-label-text font-semibold">Showing</span>
-                <App.Checkbox text="Scheduled Outages" color="red-600" />
-                <App.Checkbox text="Maintenance Visits" color="yellow-600" />
-                <App.Checkbox text="Incoming Delivery" color="indigo-600" />
-            </fieldset>
-
             <div aria-label={viewedMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
                 className="flex w-full flex-col gap-px overflow-hidden border border-brand-blue bg-brand-blue">
                 <div className="grid grid-cols-7 gap-x-px" aria-hidden="true">
@@ -150,33 +144,46 @@ function CalendarView({
                         {/* Outages: one continuous bar from start to end (split at the end of each week) */}
                         {week.bars.map(bar => {
                             const { outage } = bar;
-                            return <button
+                            return <div
                                 key={`${outage.id ?? `${outage.plant}-${outage.start}-${outage.description}`}-${week.days[0].dateKey}`}
-                                type="button"
-                                aria-label={`Open outage details: ${outage.plant}, ${outage.description}${outage.flag ? `, flagged: ${outage.flag}` : ''}`}
-                                title={`${outage.plant}: ${outage.description}\n${outage.start} to ${outage.end} (${outage.type})${outage.flag ? `\nFlag: ${outage.flag}` : ''}`}
-                                onClick={() => onOutageClick(outage)}
                                 style={{ gridColumn: `${bar.startColumn + 1} / span ${bar.span}`, gridRow: bar.lane + 2 }}
-                                className={`calendar-outage-bar z-[1] my-0.5 flex h-4 min-w-0 cursor-pointer items-center gap-1 px-1.5 text-left text-[10px] leading-none
+                                className={`calendar-outage-bar z-[1] my-0.5 flex h-5 min-w-0 items-center gap-1 px-1 text-[11px] font-medium leading-none
                                     ${outage.type === "Major"
-                                        ? "bg-red-100 text-red-900 hover:bg-red-200 dark:bg-red-400/20 dark:text-red-100 dark:hover:bg-red-400/30"
-                                        : "bg-slate-200 text-slate-800 hover:bg-slate-300 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"}
+                                        ? "bg-red-100 text-red-900 dark:bg-red-400/20 dark:text-red-100"
+                                        : "bg-slate-200 text-slate-800 dark:bg-white/10 dark:text-slate-200"}
                                     ${bar.continuesBefore ? "" : "ml-1 rounded-l-full"} ${bar.continuesAfter ? "" : "mr-1 rounded-r-full"}
-                                    focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-green`}
+                                    `}
                             >
                                 {bar.continuesBefore && <span aria-hidden="true" className="opacity-60">‹</span>}
-                                {/* Flag: just the icon; hovering it shows the flag text */}
-                                {outage.flag &&
-                                    <span className="group/flag relative inline-flex shrink-0 text-amber-500 dark:text-amber-300">
-                                        <FlagIcon className="h-3 w-3" />
-                                        <span role="tooltip"
-                                            className="pointer-events-none absolute bottom-full left-0 z-20 mb-1.5 hidden whitespace-nowrap rounded-md border border-line bg-main-background px-2 py-1 text-xs font-semibold text-text shadow-lg group-hover/flag:block">
-                                            <span className="text-amber-500 dark:text-amber-300">Flag:</span> {outage.flag}
-                                        </span>
-                                    </span>}
-                                <span className="truncate"><b className="font-semibold">{outage.plant}</b> · {outage.description}</span>
-                                {bar.continuesAfter && <span aria-hidden="true" className="ml-auto pl-1 opacity-60">›</span>}
-                            </button>
+                                <button
+                                    type="button"
+                                    aria-label={`Filter tasks associated with ${outage.plant}: ${outage.description}`}
+                                    title="Show tasks associated with this outage"
+                                    onClick={() => onFilterTasksByOutage(outage)}
+                                    className="flex h-full shrink-0 items-center rounded-sm bg-amber-200/80 px-0.5 text-amber-700 hover:bg-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-amber-700"
+                                >
+                                    <App.Icon.MagnifyingGlass />
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-label={`Open outage details: ${outage.plant}, ${outage.description}${outage.flag ? `, flagged: ${outage.flag}` : ''}`}
+                                    title={`${outage.plant}: ${outage.description}\n${outage.start} to ${outage.end} (${outage.type})${outage.flag ? `\nFlag: ${outage.flag}` : ''}`}
+                                    onClick={() => onOutageClick(outage)}
+                                    className="flex h-full min-w-0 flex-1 items-center gap-1 text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-green"
+                                >
+                                    {/* Flag: just the icon; hovering it shows the flag text */}
+                                    {outage.flag &&
+                                        <span className="group/flag relative inline-flex shrink-0 text-amber-500 dark:text-amber-300">
+                                            <FlagIcon className="h-3 w-3" />
+                                            <span role="tooltip"
+                                                className="pointer-events-none absolute bottom-full left-0 z-20 mb-1.5 hidden whitespace-nowrap rounded-md border border-line bg-main-background px-2 py-1 text-xs font-semibold text-text shadow-lg group-hover/flag:block">
+                                                <span className="text-amber-500 dark:text-amber-300">Flag:</span> {outage.flag}
+                                            </span>
+                                        </span>}
+                                    <span className="truncate text-[11px] font-medium sm:text-xs"><b className="font-semibold">{outage.plant}</b> · {outage.description}</span>
+                                    {bar.continuesAfter && <span aria-hidden="true" className="ml-auto pl-1 opacity-60">›</span>}
+                                </button>
+                            </div>
                         })}
 
                         {/* Tasks due that day */}

@@ -7,6 +7,7 @@ import drawing2043635 from "./RE__TDA_drawings/204363-5-FK_B.pdf?url"
 import drawing2043636 from "./RE__TDA_drawings/204363-6-TA_B.pdf?url"
 import drawing8002891 from "./RE__TDA_drawings/800289-1_D.pdf?url"
 import drawing8002894 from "./RE__TDA_drawings/800289-4_C.pdf?url"
+import { buildOutageFollowUpTasks } from "./Recurrence"
 
 /** A Top Assembly Drawing (TAD) file. `url` is an image or PDF path (e.g. "/tad/limerick-u1.png") or an uploaded file's URL. */
 export type Drawing = {
@@ -29,6 +30,16 @@ export type TadPart = {
     deliveryWeeks: number,
 }
 
+export type TadTag = {
+    id: string,
+    tagNumber: string,
+    installationStatus: "Installed" | "Spare" | "Not installed" | "Removed",
+    operationalStatus: "Active" | "Inactive" | "Unknown",
+    installDate: string,
+    lastMaintenanceDate: string,
+    maintenanceCycle: string,
+}
+
 export type Tad = {
     id: string,
     plant: string,
@@ -38,7 +49,8 @@ export type Tad = {
     operationalStatus: "Active" | "Inactive" | "Unknown",
     installDate: string,
     lastMaintenanceDate: string,
-    nextMaintenanceDate: string,
+    maintenanceCycle: string,
+    tags?: TadTag[],
     drawing: Drawing | null,
     parts: TadPart[],
 }
@@ -172,18 +184,19 @@ export const db = {
 
     /* Scheduled outages, matched to plants by name */
     outages: [
-        { plant: "Beaver Valley Nuclear Generating Station", start: "2026-10-26", end: "2026-11-20", type: "Major", description: "Unit 1 refueling outage", flag: "Waiting on parts" },
-        { plant: "Beaver Valley Nuclear Generating Station", start: "2027-04-12", end: "2027-05-07", type: "Major", description: "Unit 2 refueling outage" },
-        { plant: "Limerick Generating Station", start: "2026-11-09", end: "2026-11-13", type: "Minor", description: "Condenser tube inspection" },
-        { plant: "Limerick Generating Station", start: "2027-03-15", end: "2027-04-09", type: "Major", description: "Unit 2 refueling outage" },
-        { plant: "Peach Bottom Nuclear Generating Station", start: "2026-10-19", end: "2026-10-23", type: "Minor", description: "Feedwater pump overhaul" },
-        { plant: "Susquehanna Steam Electric Station", start: "2027-02-01", end: "2027-03-05", type: "Major", description: "Unit 1 refueling outage" },
-        { plant: "Keystone Generating Station", start: "2026-12-07", end: "2026-12-18", type: "Minor", description: "Boiler tube repair" },
-        { plant: "Conemaugh Generating Station", start: "2027-01-11", end: "2027-01-29", type: "Minor", description: "Scrubber maintenance" },
+        { id: "outage-beaver-unit-1", plant: "Beaver Valley Nuclear Generating Station", start: "2026-10-26", end: "2026-11-20", type: "Major", description: "Unit 1 refueling outage", flag: "Waiting on parts" },
+        { id: "outage-beaver-unit-2", plant: "Beaver Valley Nuclear Generating Station", start: "2027-04-12", end: "2027-05-07", type: "Major", description: "Unit 2 refueling outage" },
+        { id: "outage-limerick-condenser", plant: "Limerick Generating Station", start: "2026-11-09", end: "2026-11-13", type: "Minor", description: "Condenser tube inspection" },
+        { id: "outage-limerick-unit-2", plant: "Limerick Generating Station", start: "2027-03-15", end: "2027-04-09", type: "Major", description: "Unit 2 refueling outage" },
+        { id: "outage-peach-bottom-feedwater", plant: "Peach Bottom Nuclear Generating Station", start: "2026-10-19", end: "2026-10-23", type: "Minor", description: "Feedwater pump overhaul" },
+        { id: "outage-susquehanna-unit-1", plant: "Susquehanna Steam Electric Station", start: "2027-02-01", end: "2027-03-05", type: "Major", description: "Unit 1 refueling outage" },
+        { id: "outage-keystone-boiler", plant: "Keystone Generating Station", start: "2026-12-07", end: "2026-12-18", type: "Minor", description: "Boiler tube repair" },
+        { id: "outage-conemaugh-scrubber", plant: "Conemaugh Generating Station", start: "2027-01-11", end: "2027-01-29", type: "Minor", description: "Scrubber maintenance" },
     ] as Outage[],
 
     tasks: [
         {
+            outageId: "outage-beaver-unit-1",
             title: "Review inspection report",
             plant: "Beaver Valley Nuclear Generating Station",
             assignee: "John Doe",
@@ -193,6 +206,7 @@ export const db = {
             Confirm that all items to be replaced in the next outage have been documented.`
         },
         {
+            outageId: "outage-limerick-condenser",
             title: "Approve maintenance work order",
             assignee: "John Doe",
             plant: "Limerick Generating Station",
@@ -200,6 +214,7 @@ export const db = {
             category: "Maintenance"
         },
         {
+            outageId: "outage-peach-bottom-feedwater",
             title: "Confirm contractor schedule",
             assignee: "John Doe",
             plant: "Peach Bottom Nuclear Generating Station",
@@ -207,6 +222,7 @@ export const db = {
             category: "Scheduling"
         },
         {
+            outageId: "outage-susquehanna-unit-1",
             title: "Update equipment records",
             assignee: "John Doe",
             plant: "Susquehanna Steam Electric Station",
@@ -214,6 +230,7 @@ export const db = {
             category: "Records"
         },
         {
+            outageId: "outage-keystone-boiler",
             title: "Submit outage documentation",
             assignee: "John Doe",
             plant: "Keystone Generating Station",
@@ -221,6 +238,7 @@ export const db = {
             category: "Documentation"
         },
         {
+            outageId: "outage-conemaugh-scrubber",
             title: "Complete safety checklist",
             assignee: "John Doe",
             plant: "Conemaugh Generating Station",
@@ -243,6 +261,10 @@ export const db = {
         },
     ] as Task[]
 }
+
+db.tasks.push(...db.outages.flatMap(outage =>
+    buildOutageFollowUpTasks(outage, dateOffsetFromToday(0))
+))
 
 const suppliedDrawings: Drawing[] = [
     { name: "204363-1-FK_B.pdf", url: drawing2043631 },
@@ -327,7 +349,16 @@ export const seededTads: Tad[] = db.plants.flatMap((plant, plantIndex) => {
             operationalStatus: ["Active", "Active", "Inactive", "Unknown"][plantIndex % 4] as Tad["operationalStatus"],
             installDate: `${2016 + plantIndex % 7}-${String(1 + plantIndex % 12).padStart(2, "0")}-15`,
             lastMaintenanceDate: `202${plantIndex % 5}-${String(1 + (plantIndex + drawingIndex) % 12).padStart(2, "0")}-10`,
-            nextMaintenanceDate: `2027-${String(1 + (plantIndex + drawingIndex) % 12).padStart(2, "0")}-20`,
+            maintenanceCycle: `${1 + (plantIndex + drawingIndex) % 12} months`,
+            tags: Array.from({ length: 2 }, (_, tagIndex) => ({
+                id: `${id}-tag-${tagIndex + 1}`,
+                tagNumber: `${tagIndex === 0 ? "TAD" : "TAG"}-${String(plantIndex + 1).padStart(2, "0")}-${drawingIndex + 1}-${tagIndex + 1}`,
+                installationStatus: ["Installed", "Spare", "Not installed", "Removed"][plantIndex % 4] as TadTag["installationStatus"],
+                operationalStatus: ["Active", "Active", "Inactive", "Unknown"][(plantIndex + tagIndex) % 4] as TadTag["operationalStatus"],
+                installDate: `${2016 + (plantIndex + tagIndex) % 7}-${String(1 + plantIndex % 12).padStart(2, "0")}-15`,
+                lastMaintenanceDate: `202${(plantIndex + tagIndex) % 5}-${String(1 + (plantIndex + drawingIndex + tagIndex) % 12).padStart(2, "0")}-10`,
+                maintenanceCycle: `${1 + (plantIndex + drawingIndex + tagIndex) % 12} months`,
+            })),
             drawing: { ...drawing },
             parts: [0, 1].map((partIndex) => {
                 const part = dummyPartCatalog[(plantIndex + drawingIndex + partIndex) % dummyPartCatalog.length]
