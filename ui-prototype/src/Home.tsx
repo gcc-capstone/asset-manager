@@ -51,6 +51,7 @@ function Home(): React.JSX.Element {
   );
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedOutage, setSelectedOutage] = useState<Outage | null>(null);
+  const [calendarNavigation, setCalendarNavigation] = useState<{ outage: Outage, nonce: number } | null>(null);
   const [plantOpenedFromTask, setPlantOpenedFromTask] = useState(false);
   const [plantOpenedFromCalendar, setPlantOpenedFromCalendar] = useState(false);
 
@@ -106,6 +107,16 @@ function Home(): React.JSX.Element {
     setPlantOpenedFromTask(false);
     setPlantOpenedFromCalendar(true);
     setActiveTab("Plants");
+  }
+
+  function openOutageInCalendar(outage: Outage) {
+    setCalendarNavigation(current => ({ outage, nonce: (current?.nonce ?? 0) + 1 }));
+    setSelectedPlant(null);
+    setSelectedTask(null);
+    setSelectedOutage(null);
+    setPlantOpenedFromTask(false);
+    setPlantOpenedFromCalendar(false);
+    setActiveTab("Tasks");
   }
 
   function backToTasks() {
@@ -222,6 +233,7 @@ function Home(): React.JSX.Element {
             ? backToCalendar
             : plantOpenedFromTask ? backToTasks : () => setSelectedPlant(null)}
           onOpenReport={outage => openOutageReport(outage, selectedPlant)}
+          onOpenInCalendar={openOutageInCalendar}
           submittedReportIds={submittedReportIds}
           onReportSubmitted={markReportSubmitted}
           backToTasks={plantOpenedFromTask}
@@ -252,6 +264,7 @@ function Home(): React.JSX.Element {
           onPlantSelect={openPlantFromTask}
           outages={outages}
           onOutageSelect={openPlantFromOutage}
+          calendarNavigation={calendarNavigation}
         />
       </div>
       : null}
