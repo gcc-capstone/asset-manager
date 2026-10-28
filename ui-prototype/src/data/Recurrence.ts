@@ -84,6 +84,8 @@ export const STANDARD_OUTAGE_TASKS: TaskTemplate[] = [
         description: "Review the outage's TADs and order any parts that need to be bought (see each TAD's inventory)." },
     { key: "confirm-contractor", title: "Confirm contractor schedule", category: "Scheduling", relativeTo: "start", days: -42,
         description: "Confirm crews, contractors and equipment for the outage dates." },
+    { key: "review-bill-of-sale", title: "Review bill of sale", category: "Documentation", relativeTo: "start", days: -14,
+        description: "Review the bill of sale for this outage." },
     { key: "walkdown", title: "Pre-outage walkdown", category: "Inspection", relativeTo: "start", days: -7,
         description: "Walk down the equipment covered by this outage and confirm the scope." },
     { key: "service-report", title: "Submit service report", category: "Documentation", relativeTo: "end", days: 7,
@@ -102,6 +104,32 @@ function monthYear(date: string): string {
     return fromDateString(date).toLocaleDateString(undefined, { month: "short", year: "numeric" })
 }
 
+function buildOutageTask(outage: Outage, template: TaskTemplate, completed = false): Task {
+    const anchor = template.relativeTo === "start" ? outage.start : outage.end
+    return {
+        id: `${outage.id}-${template.key}`,
+        outageId: outage.id,
+        title: `${template.title} for ${monthYear(outage.start)} outage`,
+        completed,
+        plant: outage.plant,
+        assignee: undefined,
+        dueDate: addDays(anchor, template.days),
+        category: template.category,
+        description: `${template.description}\n\n${outage.type} outage: ${outage.start} to ${outage.end}.\n${outage.description}`,
+    }
+}
+
+/** Bill-of-sale and service-report tasks for an existing outage */
+export function buildOutageFollowUpTasks(outage: Outage, today: string): Task[] {
+    return STANDARD_OUTAGE_TASKS
+        .filter(template => template.key === "review-bill-of-sale" || template.key === "service-report")
+        .map(template => {
+            const task = buildOutageTask(outage, template)
+            task.completed = template.key === "review-bill-of-sale" && task.dueDate < today
+            return task
+        })
+}
+
 /**
  * The standard checklist tasks for one outage. Tasks that would already be past due are skipped
  * (e.g. "Order parts" for an outage that starts next week).
@@ -110,19 +138,6 @@ function monthYear(date: string): string {
  */
 export function buildOutageTasks(outage: Outage, today: string): Task[] {
     return STANDARD_OUTAGE_TASKS
-        .map((template): Task => {
-            const anchor = template.relativeTo === "start" ? outage.start : outage.end
-            return {
-                id: `${outage.id}-${template.key}`,
-                outageId: outage.id,
-                title: `${template.title} for ${monthYear(outage.start)} outage`,
-                completed: false,
-                plant: outage.plant,
-                assignee: undefined,
-                dueDate: addDays(anchor, template.days),
-                category: template.category,
-                description: `${template.description}\n\n${outage.type} outage: ${outage.start} to ${outage.end}.\n${outage.description}`,
-            }
-        })
+        .map(template => buildOutageTask(outage, template))
         .filter(task => task.dueDate >= today)
 }
