@@ -20,6 +20,19 @@ function formatDate(date: string): string {
 }
 
 /** Returns a drawing's tags, including a fallback for older TAD records that have only drawing-level fields. */
+function maintenanceCycleParts(cycle: string): { amount: string; unit: "week" | "month" | "year" } {
+    const match = cycle.trim().match(/^(\d+)\s*(week|weeks|month|months|year|years)$/i);
+    if (!match) return { amount: "", unit: "month" };
+    const unit = match[2].toLowerCase().replace(/s$/, "") as "week" | "month" | "year";
+    return { amount: match[1], unit };
+}
+
+function formatMaintenanceCycle(cycle: string): string {
+    const { amount, unit } = maintenanceCycleParts(cycle);
+    if (!amount) return "Not set";
+    return `${amount} ${unit}${Number(amount) === 1 ? "" : "s"}`;
+}
+
 function tadTags(tad: Tad): TadTag[] {
     if (tad.tags?.length) return tad.tags;
     return [{
@@ -29,7 +42,7 @@ function tadTags(tad: Tad): TadTag[] {
         operationalStatus: tad.operationalStatus,
         installDate: tad.installDate,
         lastMaintenanceDate: tad.lastMaintenanceDate,
-        nextMaintenanceDate: tad.nextMaintenanceDate,
+        maintenanceCycle: tad.maintenanceCycle,
     }];
 }
 
@@ -969,7 +982,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
             operationalStatus: "Unknown",
             installDate: "",
             lastMaintenanceDate: "",
-            nextMaintenanceDate: "",
+            maintenanceCycle: "",
             tags: [],
             drawing: null,
             parts: [],
@@ -999,7 +1012,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
             operationalStatus: "Unknown",
             installDate: "",
             lastMaintenanceDate: "",
-            nextMaintenanceDate: "",
+            maintenanceCycle: "",
         }] });
     }
 
@@ -1069,7 +1082,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                 operationalStatus: "Unknown",
                 installDate: "",
                 lastMaintenanceDate: "",
-                nextMaintenanceDate: "",
+                maintenanceCycle: "",
             }] });
         });
     }
@@ -1203,8 +1216,16 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                                             <input type="date" className={formStyles.input} value={tag.installDate} onChange={e => updateTag(tag.id, { installDate: e.target.value })} /></label>
                                         <label className="flex flex-col gap-1"><span className={formStyles.label}>Last maintenance</span>
                                             <input type="date" className={formStyles.input} value={tag.lastMaintenanceDate} onChange={e => updateTag(tag.id, { lastMaintenanceDate: e.target.value })} /></label>
-                                        <label className="flex flex-col gap-1"><span className={formStyles.label}>Next maintenance</span>
-                                            <input type="date" className={formStyles.input} value={tag.nextMaintenanceDate} onChange={e => updateTag(tag.id, { nextMaintenanceDate: e.target.value })} /></label>
+                                        <label className="flex flex-col gap-1"><span className={formStyles.label}>Maintenance cycle</span>
+                                            {(() => { const cycle = maintenanceCycleParts(tag.maintenanceCycle); return <div className="grid grid-cols-[minmax(0,1fr)_minmax(6rem,1fr)] gap-2">
+                                                <input type="number" min="1" step="1" className={formStyles.input} value={cycle.amount}
+                                                    onChange={e => updateTag(tag.id, { maintenanceCycle: `${e.target.value} ${cycle.unit}` })} />
+                                                <select className={formStyles.input} value={cycle.unit} onChange={e => updateTag(tag.id, { maintenanceCycle: `${cycle.amount} ${e.target.value}` })}>
+                                                    <option value="week">{Number(cycle.amount) === 1 ? "week" : "weeks"}</option>
+                                                    <option value="month">{Number(cycle.amount) === 1 ? "month" : "months"}</option>
+                                                    <option value="year">{Number(cycle.amount) === 1 ? "year" : "years"}</option>
+                                                </select>
+                                            </div> })()}</label>
                                         <div className="sm:col-span-2 xl:col-span-3 flex justify-end">
                                             <button type="button" className="text-sm font-semibold text-red-500" onClick={() => removeTag(tag.id)}>Remove tag</button>
                                         </div>
@@ -1320,7 +1341,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                                 <div className="overflow-x-auto rounded border border-line">
                                     <table className="w-full border-collapse text-sm">
                                         <thead><tr className="bg-main-background text-left text-text-muted">
-                                            {["Tag", "Install date", "Last maintenance", "Next maintenance"].map(label =>
+                                            {["Tag", "Install date", "Last maintenance", "Maintenance cycle"].map(label =>
                                                 <th key={label} className="whitespace-nowrap border-b border-line px-3 py-2 font-semibold">{label}</th>)}
                                         </tr></thead>
                                         <tbody>{tadTags(selectedTad).map(tag =>
@@ -1328,7 +1349,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                                                 <td className="whitespace-nowrap px-3 py-2 font-semibold text-text">{tag.tagNumber || "Unnamed tag"}</td>
                                                 <td className="whitespace-nowrap px-3 py-2">{tag.installDate ? formatDate(tag.installDate) : "Not recorded"}</td>
                                                 <td className="whitespace-nowrap px-3 py-2">{tag.lastMaintenanceDate ? formatDate(tag.lastMaintenanceDate) : "Not recorded"}</td>
-                                                <td className="whitespace-nowrap px-3 py-2">{tag.nextMaintenanceDate ? formatDate(tag.nextMaintenanceDate) : "Not scheduled"}</td>
+                                                <td className="whitespace-nowrap px-3 py-2">                                                {formatMaintenanceCycle(tag.maintenanceCycle)}</td>
                                             </tr>)}
                                         </tbody>
                                     </table>
