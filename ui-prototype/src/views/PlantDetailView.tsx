@@ -1050,6 +1050,30 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
         setEditorTab("General Info");
     }
 
+    function editTadAssets() {
+        if (!selectedTad) return;
+        setDraftTad({ ...selectedTad, tags: tadTags(selectedTad).map(tag => ({ ...tag })) });
+        setIsNewTad(false);
+        setIsEditing(true);
+        setEditorTab("General Info");
+    }
+
+    function addTadAsset() {
+        editTadAssets();
+        window.requestAnimationFrame(() => {
+            const currentTags = selectedTad ? tadTags(selectedTad) : [];
+            setDraftTad({ ...selectedTad!, tags: [...currentTags, {
+                id: `tag-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                tagNumber: "",
+                installationStatus: "Not installed",
+                operationalStatus: "Unknown",
+                installDate: "",
+                lastMaintenanceDate: "",
+                nextMaintenanceDate: "",
+            }] });
+        });
+    }
+
     function editTadInventory() {
         if (!selectedTad) return;
         setDraftTad({ ...selectedTad, parts: selectedTad.parts.map(part => ({ ...part })) });
@@ -1162,7 +1186,7 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                         </div>
                             <section className="flex flex-col gap-3">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="font-semibold text-text">Tags associated with this TAD</h3>
+                                    <h3 className="font-semibold text-text">Tags</h3>
                                     <button type="button" className={formStyles.ghostButton} onClick={addTag}>+ Add tag</button>
                                 </div>
                                 {tadTags(selectedTad).map(tag =>
@@ -1288,6 +1312,10 @@ function PlantAssets({ plant, tads, initialSelectedId = null, onAddTad, onUpdate
                                         <span className="rounded-full bg-brand-light-green px-3 py-1 text-brand-green">{selectedTad.installationStatus}</span>
                                         <span className="rounded-full bg-main-background px-3 py-1 text-text-muted">{selectedTad.operationalStatus}</span>
                                     </div>
+                                </div>
+                                <div className="mb-3 flex items-center justify-between gap-2">
+                                    <h4 className="font-semibold text-text">Tags</h4>
+                                    <button className={formStyles.ghostButton} onClick={addTadAsset}>+ Add asset</button>
                                 </div>
                                 <div className="overflow-x-auto rounded border border-line">
                                     <table className="w-full border-collapse text-sm">
