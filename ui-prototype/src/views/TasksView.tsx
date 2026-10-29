@@ -1,6 +1,8 @@
 import { useRef, useState } from "react"
 import CalendarView from "./CalendarView"
 import db, { dateOffsetFromToday, replaceTasks, type Outage, type Task, type Plant } from "../data/Data"
+import { App } from "../components/Components";
+
 
 /**
  * Formats a date to be displayed in a task detail view.
