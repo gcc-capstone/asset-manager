@@ -80,14 +80,14 @@ type TaskTemplate = {
 
 /** Tasks created automatically for every outage */
 export const STANDARD_OUTAGE_TASKS: TaskTemplate[] = [
-    { key: "order-parts", title: "Order parts", category: "Procurement", relativeTo: "start", days: -84,
-        description: "Review the outage's TADs and order any parts that need to be bought (see each TAD's inventory)." },
-    { key: "confirm-contractor", title: "Confirm contractor schedule", category: "Scheduling", relativeTo: "start", days: -42,
-        description: "Confirm crews, contractors and equipment for the outage dates." },
+    //{ key: "order-parts", title: "Order parts", category: "Procurement", relativeTo: "start", days: -84,
+    //    description: "Review the outage's TADs and order any parts that need to be bought (see each TAD's inventory)." },
+    //{ key: "confirm-contractor", title: "Confirm contractor schedule", category: "Scheduling", relativeTo: "start", days: -42,
+    //    description: "Confirm crews, contractors and equipment for the outage dates." },
     { key: "review-bill-of-sale", title: "Review bill of materials", category: "Documentation", relativeTo: "start", days: -14,
         description: "Review the bill of materials for this outage." },
-    { key: "walkdown", title: "Pre-outage walkdown", category: "Inspection", relativeTo: "start", days: -7,
-        description: "Walk down the equipment covered by this outage and confirm the scope." },
+    //{ key: "walkdown", title: "Pre-outage walkdown", category: "Inspection", relativeTo: "start", days: -7,
+    //    description: "Walk down the equipment covered by this outage and confirm the scope." },
     { key: "service-report", title: "Submit service report", category: "Documentation", relativeTo: "end", days: 7,
         description: "Submit the service report for this outage." },
 ]

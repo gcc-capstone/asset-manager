@@ -63,16 +63,24 @@ export function BomModal({ outage, tads, onSent, onClose }: {
         downloadCsv(fileName, bomCsv(outage, includedTads))
     }
 
+    function openEmailForm(event: React.MouseEvent<HTMLButtonElement>) {
+        event.preventDefault()
+        event.stopPropagation()
+        setError("")
+        setStep("email")
+    }
+
     function send(e: React.FormEvent) {
         e.preventDefault()
         const recipients = splitEmails(to)
         const copies = splitEmails(cc)
         const invalid = [...recipients, ...copies].filter(email => !EMAIL_PATTERN.test(email))
-        if (recipients.length === 0) return setError("Enter at least one email address to send to.")
         if (invalid.length) return setError(`Check ${invalid.length === 1 ? "this address" : "these addresses"}: ${invalid.join(", ")}`)
         if (!subject.trim()) return setError("Enter a subject.")
-        const who = recipients.length === 1 ? recipients[0] : `${recipients.length} recipients`
-        onSent(`Bill of Materials emailed to ${who}.`)
+        const confirmation = recipients.length === 0
+            ? "Bill of Materials emailed."
+            : `Bill of Materials emailed to ${recipients.length === 1 ? recipients[0] : `${recipients.length} recipients`}.`
+        onSent(confirmation)
     }
 
     const tadPicker = tads.length > 1 &&
@@ -87,13 +95,18 @@ export function BomModal({ outage, tads, onSent, onClose }: {
                 </label>)}
         </fieldset>
 
-    if (step === "email") {
-        return <Modal title="Email Bill of Materials" onClose={onClose}
-            footer={<>
+    return <Modal title={step === "email" ? "Email Bill of Materials" : "Bill of Materials"} wide={step === "bom"} onClose={onClose}
+        footer={step === "email"
+            ? <>
                 <button type="button" className={formStyles.ghostButton} onClick={() => { setError(""); setStep("bom") }}>← Back</button>
                 <button type="submit" form="bom-email-form" className={formStyles.primaryButton}>Send</button>
+            </>
+            : <>
+                <button type="button" className={formStyles.ghostButton} disabled={lines.length === 0} onClick={download}>Download CSV</button>
+                <button type="button" className={formStyles.primaryButton} disabled={lines.length === 0} onClick={openEmailForm}>Email…</button>
             </>}>
-            <form id="bom-email-form" onSubmit={send} noValidate className="flex flex-col gap-3">
+        {step === "email"
+            ? <form id="bom-email-form" onSubmit={send} noValidate className="flex flex-col gap-3">
                 <label className="flex flex-col gap-1">
                     <span className={formStyles.label}>To</span>
                     <input id="bom-email-to" type="text" inputMode="email" autoComplete="email" className={formStyles.input}
@@ -128,47 +141,40 @@ export function BomModal({ outage, tads, onSent, onClose }: {
                 {error && <p role="alert" className="text-sm font-semibold text-red-500">{error}</p>}
                 <p className="text-xs text-text-muted">Prototype: the email isn't actually sent yet.</p>
             </form>
-        </Modal>
-    }
-
-    return <Modal title="Bill of Materials" wide onClose={onClose}
-        footer={<>
-            <button type="button" className={formStyles.ghostButton} disabled={lines.length === 0} onClick={download}>Download CSV</button>
-            <button type="button" className={formStyles.primaryButton} disabled={lines.length === 0} onClick={() => setStep("email")}>Email…</button>
-        </>}>
-        <p className="text-text">{title}</p>
-        {tadPicker}
-
-        {lines.length === 0
-            ? <p className="rounded-lg border border-dashed border-line p-6 text-center text-sm text-text-muted">
-                {includedTads.length === 0 ? "Select at least one TAD." : "These TADs have no parts yet. Add parts under Assets."}
-            </p>
             : <>
-                <div className="overflow-x-auto rounded-lg border border-line">
-                    <table className="w-full border-collapse text-sm">
-                        <thead><tr className="bg-main-background text-left text-text-muted">
-                            {BOM_COLUMNS.map(column =>
-                                <th key={column.label} className={`whitespace-nowrap border-b border-line px-3 py-2 font-semibold ${column.numeric ? "text-right" : ""}`}>{column.label}</th>)}
-                        </tr></thead>
-                        <tbody>
-                            {lines.map(line =>
-                                <tr key={`${line.tad.id}-${line.part.id}`} className="border-b border-line last:border-0">
-                                    {BOM_COLUMNS.map(column => {
-                                        const value = column.value(line)
-                                        const toBuy = column.label === "To buy" && Number(value) > 0
-                                        return <td key={column.label}
-                                            className={`px-3 py-2 ${column.numeric ? "text-right tabular-nums" : column.label === "Description" ? "min-w-48" : "whitespace-nowrap"} ${toBuy ? "font-bold text-red-500" : "text-text"}`}>
-                                            {value === "" ? "—" : value}
-                                        </td>
-                                    })}
-                                </tr>)}
-                        </tbody>
-                    </table>
-                </div>
-                <p className="text-sm text-text-muted">
-                    {totals.lines} parts · {totals.needed} needed · <span className={totals.toBuy > 0 ? "font-semibold text-red-500" : ""}>{totals.toBuy} to buy</span>
-                    {totals.linesToBuy > 0 && ` (${totals.linesToBuy} part number${totals.linesToBuy === 1 ? "" : "s"})`}
-                </p>
+                <p className="text-text">{title}</p>
+                {tadPicker}
+                {lines.length === 0
+                    ? <p className="rounded-lg border border-dashed border-line p-6 text-center text-sm text-text-muted">
+                        {includedTads.length === 0 ? "Select at least one TAD." : "These TADs have no parts yet. Add parts under Assets."}
+                    </p>
+                    : <>
+                        <div className="overflow-x-auto rounded-lg border border-line">
+                            <table className="w-full border-collapse text-sm">
+                                <thead><tr className="bg-main-background text-left text-text-muted">
+                                    {BOM_COLUMNS.map(column =>
+                                        <th key={column.label} className={`whitespace-nowrap border-b border-line px-3 py-2 font-semibold ${column.numeric ? "text-right" : ""}`}>{column.label}</th>)}
+                                </tr></thead>
+                                <tbody>
+                                    {lines.map(line =>
+                                        <tr key={`${line.tad.id}-${line.part.id}`} className="border-b border-line last:border-0">
+                                            {BOM_COLUMNS.map(column => {
+                                                const value = column.value(line)
+                                                const toBuy = column.label === "To buy" && Number(value) > 0
+                                                return <td key={column.label}
+                                                    className={`px-3 py-2 ${column.numeric ? "text-right tabular-nums" : column.label === "Description" ? "min-w-48" : "whitespace-nowrap"} ${toBuy ? "font-bold text-red-500" : "text-text"}`}>
+                                                    {value === "" ? "—" : value}
+                                                </td>
+                                            })}
+                                        </tr>)}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p className="text-sm text-text-muted">
+                            {totals.lines} parts · {totals.needed} needed · <span className={totals.toBuy > 0 ? "font-semibold text-red-500" : ""}>{totals.toBuy} to buy</span>
+                            {totals.linesToBuy > 0 && ` (${totals.linesToBuy} part number${totals.linesToBuy === 1 ? "" : "s"})`}
+                        </p>
+                    </>}
             </>}
     </Modal>
 }
