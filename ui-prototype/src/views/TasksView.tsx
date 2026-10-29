@@ -1,7 +1,6 @@
 import { useRef, useState } from "react"
 import CalendarView from "./CalendarView"
 import db, { dateOffsetFromToday, replaceTasks, type Outage, type Task, type Plant } from "../data/Data"
-import { App } from "../components/Components";
 
 /**
  * Formats a date to be displayed in a task detail view.
@@ -139,7 +138,16 @@ function TaskDetailView({
         </button>
         <br />
         <span className="text-sm text-text-muted">Task</span>
-        <App.Title text={task.title} />
+        {isEditing
+            ? <input
+                type="text"
+                required
+                value={draft.title}
+                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                placeholder="Task name"
+                className={`${fieldClassName} mt-1 text-xl font-bold`}
+            />
+            : <div className="app-title text-brand-blue">{task.title}</div>}
 
         <form ref={formRef} className="flex min-h-0 flex-1 flex-col overflow-hidden" onSubmit={saveTask}>
             <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto">
@@ -348,7 +356,7 @@ function TasksView({
         }
 
         const task: Task = {
-            title: "Untitled task",
+            title: "",5
             outageId: outageFilter?.id,
             completed: false,
             plant: plant.name,
