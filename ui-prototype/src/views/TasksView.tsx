@@ -356,7 +356,7 @@ function TasksView({
         }
 
         const task: Task = {
-            title: "",5
+            title: "",
             outageId: outageFilter?.id,
             completed: false,
             plant: plant.name,
