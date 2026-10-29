@@ -57,17 +57,22 @@ function CalendarView({
     onTaskClick,
     onOutageClick,
     onFilterTasksByOutage,
+    initialDate,
+    taskFilterOutageId,
 }: {
     outages: Outage[],
     onTaskClick: (task: Task) => void,
     onOutageClick: (outage: Outage) => void,
     onFilterTasksByOutage: (outage: Outage) => void,
+    initialDate?: string,
+    taskFilterOutageId?: string,
 }): React.JSX.Element {
 
     const currentDate: Date = new Date();
-    const [viewedMonth, setViewedMonth] = useState(() =>
-        new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
-    );
+    const [viewedMonth, setViewedMonth] = useState(() => {
+        const date = initialDate ? new Date(`${initialDate}T00:00:00`) : currentDate;
+        return new Date(date.getFullYear(), date.getMonth(), 1);
+    });
     const year: number = viewedMonth.getFullYear();
     const month: number = viewedMonth.getMonth();
     const firstDay = new Date(year, month, 1);
@@ -90,7 +95,7 @@ function CalendarView({
     });
 
     const tasksByDate = new Map<string, Task[]>();
-    for (const task of db.tasks) {
+    for (const task of db.tasks.filter(task => !taskFilterOutageId || task.outageId === taskFilterOutageId)) {
         const tasksForDate = tasksByDate.get(task.dueDate) ?? [];
         tasksForDate.push(task);
         tasksByDate.set(task.dueDate, tasksForDate);

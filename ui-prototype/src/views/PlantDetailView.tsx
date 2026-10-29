@@ -78,6 +78,7 @@ function PlantDetailView({
     onUpdateTad,
     onDeleteTad,
     onOpenReport,
+    onOpenInCalendar,
     submittedReportIds,
     onReportSubmitted,
     onBack,
@@ -96,6 +97,7 @@ function PlantDetailView({
     onUpdateTad: (tad: Tad) => void,
     onDeleteTad: (id: string) => void,
     onOpenReport: (outage: Outage) => void,
+    onOpenInCalendar: (outage: Outage) => void,
     submittedReportIds: Set<string>,
     onReportSubmitted: (outage: Outage) => void,
     onBack: () => void,
@@ -161,6 +163,7 @@ function PlantDetailView({
                     onUpdateOutage={onUpdateOutage}
                     onOpenTad={openTad}
                     onOpenReport={onOpenReport}
+                    onOpenInCalendar={onOpenInCalendar}
                     submittedReportIds={submittedReportIds}
                     onReportSubmitted={onReportSubmitted} />}
                 {section === "Info" && <PlantInfo plant={plant} outages={outages} />}
@@ -190,6 +193,7 @@ function PlantOutages({
     onUpdateOutage,
     onOpenTad,
     onOpenReport,
+    onOpenInCalendar,
     submittedReportIds,
     onReportSubmitted,
 }: {
@@ -201,6 +205,7 @@ function PlantOutages({
     onUpdateOutage: (outage: Outage) => void,
     onOpenTad: (id: string) => void,
     onOpenReport: (outage: Outage) => void,
+    onOpenInCalendar: (outage: Outage) => void,
     submittedReportIds: Set<string>,
     onReportSubmitted: (outage: Outage) => void,
 }): React.JSX.Element {
@@ -257,6 +262,7 @@ function PlantOutages({
                             isFocused={outage === focusOutage}
                             onFocusElement={outage === focusOutage ? setFocusedOutageElement : undefined}
                             onOpenReport={onOpenReport}
+                            onOpenInCalendar={onOpenInCalendar}
                             reportSubmitted={submittedReportIds.has(outage.id ?? `${outage.plant}-${outage.start}`)}
                             onReportSubmitted={() => onReportSubmitted(outage)} />
                     </li>)}
@@ -289,6 +295,7 @@ function OutageCard({
     onOpenTad,
     onUpdate,
     onOpenReport,
+    onOpenInCalendar,
     reportSubmitted,
     onReportSubmitted,
     isFocused = false,
@@ -300,6 +307,7 @@ function OutageCard({
     /* Saves this outage with changes (used for the flag) */
     onUpdate: (outage: Outage) => void,
     onOpenReport: (outage: Outage) => void,
+    onOpenInCalendar: (outage: Outage) => void,
     reportSubmitted: boolean,
     onReportSubmitted: () => void,
     isFocused?: boolean,
@@ -318,6 +326,21 @@ function OutageCard({
     /* Flag popup */
     const [flagging, setFlagging] = useState(false)
 
+    function handleBomSent(message: string) {
+        setBomNotice(message)
+        setBomOpen(false)
+        onUpdate({ ...outage, billOfMaterialsSent: true })
+
+        const linkedBomTasks = db.tasks.map(task =>
+            outage.id !== undefined && task.outageId === outage.id && task.title.toLowerCase().includes("bill of material")
+                ? { ...task, completed: true }
+                : task
+        )
+        if (linkedBomTasks.some((task, index) => task !== db.tasks[index])) {
+            replaceTasks(linkedBomTasks)
+        }
+    }
+
     return <article
         ref={onFocusElement}
         className={`flex flex-col gap-4 rounded-lg border bg-main-background-2 p-5 ${isFocused ? "border-red-600 ring-2 ring-red-500" : "border-line"}`}
@@ -326,9 +349,14 @@ function OutageCard({
         {/* Dates and type */}
         <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex flex-col">
-                <span className="text-lg font-bold text-text" style={{ fontFamily: "var(--font-display)" }}>
-                    {formatDate(outage.start)} – {formatDate(outage.end)}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-lg font-bold text-text" style={{ fontFamily: "var(--font-display)" }}>
+                        {formatDate(outage.start)} – {formatDate(outage.end)}
+                    </span>
+                    <button type="button" className={formStyles.ghostButton} onClick={() => onOpenInCalendar(outage)}>
+                        Open in calendar
+                    </button>
+                </div>
                 <span className="text-sm text-text-muted">
                     {durationDays(outage.start, outage.end)} days{inProgress && " · in progress"}
                     {outage.repeatEveryMonths && <> · <span title="Repeating outage">↻ Every {outage.repeatEveryMonths} months</span></>}
@@ -368,8 +396,13 @@ function OutageCard({
         {/* Bill of Materials and service report actions (secondary, so "+ Add outage" stays the main action on the page) */}
         <div className="flex flex-wrap items-center gap-2">
             <button type="button" className={formStyles.ghostButton} disabled={outageTads.length === 0}
+                aria-label={`Bill of Materials${outage.billOfMaterialsSent ? " sent" : ""}`}
                 onClick={() => { setBomNotice(""); setBomOpen(true) }}>
                 Bill of Materials
+                {outage.billOfMaterialsSent &&
+                    <svg className="ml-2 inline h-4 w-4 text-brand-green" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M16.704 5.29a1 1 0 0 1 .006 1.414l-7.2 7.25a1 1 0 0 1-1.42 0l-3.8-3.83a1 1 0 0 1 1.42-1.408l3.09 3.114 6.493-6.534a1 1 0 0 1 1.411-.006Z" clipRule="evenodd" />
+                    </svg>}
             </button>
             {reportSubmitted
                 ? <button type="button" className={formStyles.ghostButton} onClick={() => onOpenReport(outage)}>
@@ -396,7 +429,7 @@ function OutageCard({
             <BomModal
                 outage={outage}
                 tads={outageTads}
-                onSent={message => { setBomNotice(message); setBomOpen(false) }}
+                onSent={handleBomSent}
                 onClose={() => setBomOpen(false)} />}
 
         {flagging &&

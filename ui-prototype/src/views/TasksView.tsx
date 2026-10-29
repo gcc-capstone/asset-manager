@@ -320,19 +320,21 @@ function TasksView({
     onPlantSelect,
     outages,
     onOutageSelect,
+    calendarNavigation,
 }: {
     selectedTask: Task | null,
     onTaskSelect: (task: Task | null) => void,
     onPlantSelect: (plant: Plant) => void,
     outages: Outage[],
     onOutageSelect: (outage: Outage) => void,
+    calendarNavigation: { outage: Outage, nonce: number } | null,
 }): React.JSX.Element {
 
     const [tasks, setTasks] = useState<Task[]>(db.tasks);
     const [activeTaskList, setActiveTaskList] = useState<"upcoming" | "overdue" | "completed">("upcoming");
     const [newTask, setNewTask] = useState<Task | null>(null);
     const [taskCreated, setTaskCreated] = useState(false);
-    const [outageFilter, setOutageFilter] = useState<Outage | null>(null);
+    const [outageFilter, setOutageFilter] = useState<Outage | null>(() => calendarNavigation?.outage ?? null);
     const today: string = dateOffsetFromToday(0);
 
     const visibleTasks = outageFilter?.id
@@ -467,10 +469,13 @@ function TasksView({
                     onPlantSelect={onPlantSelect}
                     onOutageSelect={onOutageSelect} />
                 : <CalendarView
+                    key={calendarNavigation?.nonce ?? "default"}
                     outages={outages}
                     onTaskClick={onTaskSelect}
                     onOutageClick={onOutageSelect}
                     onFilterTasksByOutage={setOutageFilter}
+                    initialDate={calendarNavigation?.outage.start}
+                    taskFilterOutageId={outageFilter?.id}
                 />}
         </div>
     </div>

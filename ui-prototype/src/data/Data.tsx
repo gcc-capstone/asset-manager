@@ -72,6 +72,8 @@ export type Outage = {
     repeatUntil?: string | null,
     /* Optional flag with custom text, e.g. "Waiting on parts" (shown on the outage and the calendar) */
     flag?: string,
+    /* Whether the bill of materials has been sent for this outage */
+    billOfMaterialsSent?: boolean,
 }
 
 /** The outage types you can pick when adding an outage */
