@@ -727,7 +727,7 @@ function AddOutageModal({ plant, tads, onCreate, onClose }: {
     const [everyMonths, setEveryMonths] = useState(18);
     const [endsOn, setEndsOn] = useState<'never' | 'date'>('never');
     const [repeatUntil, setRepeatUntil] = useState('');
-    const [createTasks, setCreateTasks] = useState(true);
+    const [createTasks, setCreateTasks] = useState(false);
     const [end, setEnd] = useState('');
     const [type, setType] = useState<OutageType>("Major");
     const [description, setDescription] = useState('');
